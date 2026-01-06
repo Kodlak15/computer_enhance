@@ -20,6 +20,8 @@
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             go
+            python3
+            nasm # netwide assembler
           ];
 
           shellHook = ''
