@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 )
@@ -68,13 +67,18 @@ func decodeRegister(b byte, w byte) string {
 func decodeInstructions(path string) {
 	binary, err := os.ReadFile(path)
 	if err != nil {
-		log.Println("Failed to read the first listing")
+		fmt.Printf("Failed to read source: '%s'\n", path)
 		return
 	}
 
+	// Get the name of the file being decoded
+	split_path := strings.Split(path, "/")
+	filename := split_path[len(split_path)-1]
+
 	// We will write the decoded instructions line by line to the result buffer
 	var result strings.Builder
-	result.WriteString("bits 16")
+	// result.WriteString("bits 16")
+	result.WriteString(fmt.Sprintf("; Decoded instructions for %s\nbits 16", filename))
 
 	var i = 0
 	for i < len(binary) {
@@ -118,14 +122,13 @@ func decodeInstructions(path string) {
 	fmt.Println(result.String())
 }
 
-// NOTE: Casey's solution takes the path as a command line argument, so that may be better
 func main() {
-	fmt.Println("--------------------------------------------------")
-	fmt.Println("Decoding listing_0038_single_register_mov")
-	fmt.Println("--------------------------------------------------")
-	decodeInstructions("../../perfaware/part1/listing_0037_single_register_mov")
-	fmt.Println("--------------------------------------------------")
-	fmt.Println("Decoding listing_0038_many_register_mov")
-	fmt.Println("--------------------------------------------------")
-	decodeInstructions("../../perfaware/part1/listing_0038_many_register_mov")
+	args := os.Args[1:]
+	if len(args) < 1 {
+		fmt.Println("Missing required path argument")
+		return
+	}
+
+	path := os.Args[1] // path to the binary that will be decoded
+	decodeInstructions(path)
 }
