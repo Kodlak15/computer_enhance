@@ -1,7 +1,7 @@
 #include <iostream>
 
 int main() {
-  std::cout << "Hello???" << "\n";
+  std::cout << "Are we doing it?" << "\n";
 
   return 0;
 }

@@ -20,19 +20,14 @@
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             gcc
-            gdb
-
-            # NOTE including this package was the only way I could the missing `iostream`
-            # file header warning to disappear. It isn't actually necessary to compile,
-            # only for the LSP.
             gccNGPackages_15.libstdcxx
+
+            gdb
 
             go
             python3
             nasm
           ];
-
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (with pkgs; [libcxx]);
 
           shellHook = ''
             exec zsh -c zellij
