@@ -93,8 +93,8 @@ func decodeInstructions(path string) {
 		// Since we are only decoding mov operations, this is always 0b100010
 		_ = (byte1 >> 2) & 0b00111111
 
-		d := byte1 & 0b00000010
-		w := byte1 & 0b00000001
+		d := byte1 & 0b00000010 // the d bit tells us which direction the data moves
+		w := byte1 & 0b00000001 // the w bit tells us whether we need an 8 bit or 16 bit register
 
 		// The mod field, which tells us what kind of move this is
 		// Always 0b11 in this case because we only care about register -> register

@@ -18,11 +18,21 @@
         ...
       }: {
         devShells.default = pkgs.mkShell {
-          packages = with pkgs; [
+          buildInputs = with pkgs; [
+            gcc
+            gdb
+
+            # NOTE including this package was the only way I could the missing `iostream`
+            # file header warning to disappear. It isn't actually necessary to compile,
+            # only for the LSP.
+            gccNGPackages_15.libstdcxx
+
             go
             python3
-            nasm # netwide assembler
+            nasm
           ];
+
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (with pkgs; [libcxx]);
 
           shellHook = ''
             exec zsh -c zellij
