@@ -21,7 +21,6 @@
           buildInputs = with pkgs; [
             gcc
             gccNGPackages_15.libstdcxx
-
             gdb
 
             go
