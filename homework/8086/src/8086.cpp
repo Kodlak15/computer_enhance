@@ -1,3 +1,4 @@
+#include <cassert>
 #include <stdio.h>
 
 // https://codeberg.org/bolt/8086-Users-Manual/src/branch/main/INTEL_The-8086-Family-Users-Manual.pdf
@@ -13,53 +14,21 @@ void print_byte_as_bits(char byte) {
 const char *decode_register(char byte, char w) {
     switch (byte) {
     case 0b000:
-        if (w == 0) {
-            return "al";
-        } else {
-            return "ax";
-        }
+        return w == 0 ? "al" : "ax";
     case 0b001:
-        if (w == 0) {
-            return "cl";
-        } else {
-            return "cx";
-        }
+        return w == 0 ? "cl" : "cx";
     case 0b010:
-        if (w == 0) {
-            return "dl";
-        } else {
-            return "dx";
-        }
+        return w == 0 ? "dl" : "dx";
     case 0b011:
-        if (w == 0) {
-            return "bl";
-        } else {
-            return "bx";
-        }
+        return w == 0 ? "bl" : "bx";
     case 0b100:
-        if (w == 0) {
-            return "ah";
-        } else {
-            return "sp";
-        }
+        return w == 0 ? "ah" : "sp";
     case 0b101:
-        if (w == 0) {
-            return "ch";
-        } else {
-            return "bp";
-        }
+        return w == 0 ? "ch" : "bp";
     case 0b110:
-        if (w == 0) {
-            return "dh";
-        } else {
-            return "si";
-        }
+        return w == 0 ? "dh" : "si";
     case 0b111:
-        if (w == 0) {
-            return "bh";
-        } else {
-            return "di";
-        }
+        return w == 0 ? "bh" : "di";
     }
 
     return nullptr;
@@ -87,21 +56,22 @@ int decode_instructions(char *path) {
             // Get the next byte
             char byte2 = fgetc(fptr);
 
-            // The mod field tells us what kind of move this is
+            // Mode field
             char mod = (byte2 >> 6) & 0b00000011;
 
             char reg = (byte2 >> 3) & 0b00000111;
             char rm = byte2 & 0b00000111;
 
-            // Decode the register ...
-            const char *src;
-            const char *dst;
-            if (d == 0) {
-                src = decode_register(reg, w);
-                dst = decode_register(rm, w);
-            } else {
-                src = decode_register(rm, w);
-                dst = decode_register(reg, w);
+            // Assign the source and destination registers
+            const char *src = (d == 0) ? decode_register(reg, w) : decode_register(rm, w);
+            if (src == nullptr) {
+                printf("Unable to decode source register\n");
+                return 1;
+            }
+            const char *dst = (d == 0) ? decode_register(rm, w) : decode_register(reg, w);
+            if (src == nullptr) {
+                printf("Unable to decode destination register\n");
+                return 1;
             }
 
             // Print the decoded instruction
