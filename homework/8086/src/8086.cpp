@@ -3,6 +3,7 @@
 // https://codeberg.org/bolt/8086-Users-Manual/src/branch/main/INTEL_The-8086-Family-Users-Manual.pdf
 // See page 262
 
+// Useful for debugging
 void print_byte_as_bits(char byte) {
     for (int i = 7; 0 <= i; i--) {
         printf("%c", (byte & (1 << i)) ? '1' : '0');
@@ -64,6 +65,7 @@ const char *decode_register(char byte, char w) {
     return nullptr;
 }
 
+// Decode the binary instructions inside the file at the specified path.
 int decode_instructions(char *path) {
     FILE *fptr = fopen(path, "r");
     if (fptr == nullptr) {
