@@ -71,18 +71,10 @@ int decode_instructions(char *path) {
         return 1;
     }
 
+    printf("bits 16\n\n");
+
     char byte1;
     while ((byte1 = fgetc(fptr)) != EOF) {
-        // print_byte_as_bits(byte1);
-        // putchar('\n');
-        // print_byte_as_bits(byte1 >> 2 & 0b00111111);
-        // putchar('\n');
-
-        // printf("Register to register? %s\n",
-        //        ((byte1 >> 2) & 0b00111111) == 0b100010 ? "true" : "false");
-
-        printf("bits 16\n\n");
-
         // Register to register move
         if (((byte1 >> 2) & 0b00111111) == 0b100010) {
             // the d bit tells us which direction the data moves
