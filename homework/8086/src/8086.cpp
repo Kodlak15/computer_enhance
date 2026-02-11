@@ -1,4 +1,3 @@
-#include <cassert>
 #include <stdio.h>
 
 // https://codeberg.org/bolt/8086-Users-Manual/src/branch/main/INTEL_The-8086-Family-Users-Manual.pdf
@@ -44,16 +43,17 @@ int decode_instructions(char *path) {
 
     printf("bits 16\n\n");
 
+    // NOTE should watch https://www.computerenhance.com/p/decoding-multiple-instructions-and again
+
     char byte1;
     while ((byte1 = fgetc(fptr)) != EOF) {
-        // Register to register move
         if (((byte1 >> 2) & 0b00111111) == 0b100010) {
-            // the d bit tells us which direction the data moves
+            // The d bit tells us which direction the data moves
             char d = byte1 & 0b00000010;
-            // the w bit tells us whether we need an 8 bit or 16 bit register
+            // The w bit tells us whether we need an 8 bit or 16 bit register
             char w = byte1 & 0b00000001;
 
-            // Get the next byte
+            // Read the next byte
             char byte2 = fgetc(fptr);
 
             // Mode field
@@ -61,6 +61,17 @@ int decode_instructions(char *path) {
 
             char reg = (byte2 >> 3) & 0b00000111;
             char rm = byte2 & 0b00000111;
+
+            char disp_lo;
+            char disp_hi;
+            if (mod == 0b01) {
+                // Read the next byte
+                disp_lo = fgetc(fptr);
+            } else if (mod == 0b10) {
+                // Read the next two bytes
+                disp_lo = fgetc(fptr);
+                disp_hi = fgetc(fptr);
+            }
 
             // Assign the source and destination registers
             const char *src = (d == 0) ? decode_register(reg, w) : decode_register(rm, w);
@@ -76,6 +87,7 @@ int decode_instructions(char *path) {
 
             // Print the decoded instruction
             printf("mov %s, %s\n", dst, src);
+        } else if (((byte1 >> 4) & 0b00001111) == 0b1011) {
         }
     }
     fclose(fptr);

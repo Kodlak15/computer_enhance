@@ -22,10 +22,13 @@
             gcc
             gccNGPackages_15.libstdcxx
             gdb
+            gdb-dashboard
 
             go
             python3
+
             nasm
+            xxd
           ];
 
           shellHook = ''
