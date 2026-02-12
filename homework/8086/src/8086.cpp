@@ -30,6 +30,81 @@ const char *decode_register(char byte, char w) {
         return w == 0 ? "bh" : "di";
     }
 
+    printf("Unable to decode destination register\n");
+    return nullptr;
+}
+
+const char *decode_memory(char byte, int disp) {
+    switch (byte) {
+    case 0b000: {
+        if (disp > 0) {
+            static char buf[32];
+            sprintf(buf, "[bx + si + %d]", disp);
+            return buf;
+        } else {
+            return "[bx + si]";
+        }
+    } break;
+    case 0b001: {
+        if (disp > 0) {
+            static char buf[32];
+            sprintf(buf, "[bx + di + %d]", disp);
+            return buf;
+        } else {
+            return "[bx + di]";
+        }
+    } break;
+    case 0b010: {
+        if (disp > 0) {
+            static char buf[32];
+            sprintf(buf, "[bp + si + %d]", disp);
+            return buf;
+        } else {
+            return "[bp + si]";
+        }
+    } break;
+    case 0b011: {
+        if (disp > 0) {
+            static char buf[32];
+            sprintf(buf, "[bp + di + %d]", disp);
+            return buf;
+        } else {
+            return "[bp + di]";
+        }
+    } break;
+    case 0b100: {
+        if (disp > 0) {
+            static char buf[32];
+            sprintf(buf, "[si + %d]", disp);
+            return buf;
+        } else {
+            return "[si]";
+        }
+    } break;
+    case 0b101: {
+        if (disp > 0) {
+            static char buf[32];
+            sprintf(buf, "[di + %d]", disp);
+            return buf;
+        } else {
+            return "[di]";
+        }
+    } break;
+    case 0b110: {
+        // DIRECT ADDRESS (???)
+    } break;
+    case 0b111: {
+        if (disp > 0) {
+            static char buf[32];
+            sprintf(buf, "[bx + %d]", disp);
+            return buf;
+        } else {
+            return "[bx]";
+        }
+    } break;
+    }
+
+    printf("Unable to decode memory\n");
     return nullptr;
 }
 
@@ -47,6 +122,8 @@ int decode_instructions(char *path) {
 
     char byte1;
     while ((byte1 = fgetc(fptr)) != EOF) {
+        print_byte_as_bits(byte1);
+        putchar('\n');
         if (((byte1 >> 2) & 0b00111111) == 0b100010) {
             // The d bit tells us which direction the data moves
             char d = byte1 & 0b00000010;
@@ -59,36 +136,86 @@ int decode_instructions(char *path) {
             // Mode field
             char mod = (byte2 >> 6) & 0b00000011;
 
+            // Register field
             char reg = (byte2 >> 3) & 0b00000111;
+
+            // Register/memory field
             char rm = byte2 & 0b00000111;
 
-            char disp_lo;
-            char disp_hi;
-            if (mod == 0b01) {
-                // Read the next byte
-                disp_lo = fgetc(fptr);
-            } else if (mod == 0b10) {
-                // Read the next two bytes
-                disp_lo = fgetc(fptr);
-                disp_hi = fgetc(fptr);
+            // Register or memory location the data is moving from
+            const char *src;
+            // Register or memory location the data is moving to
+            const char *dst;
+
+            // print_byte_as_bits(mod);
+            // putchar('\n');
+
+            switch (mod) {
+            case 0b00: {
+                src = (d == 0) ? decode_register(reg, w) : decode_memory(rm, 0);
+                if (src == nullptr) {
+                    return 1;
+                }
+                dst = (d == 0) ? decode_memory(rm, 0) : decode_register(reg, w);
+                if (dst == nullptr) {
+                    return 1;
+                }
+            } break;
+            case 0b01: {
+                char disp_lo = fgetc(fptr);
+                src = (d == 0) ? decode_register(reg, w) : decode_memory(rm, disp_lo);
+                if (src == nullptr) {
+                    return 1;
+                }
+                dst = (d == 0) ? decode_memory(rm, disp_lo) : decode_register(reg, w);
+                if (dst == nullptr) {
+                    return 1;
+                }
+            } break;
+            case 0b10: {
+                char disp_lo = fgetc(fptr);
+                char disp_hi = fgetc(fptr);
+                src = (d == 0) ? decode_register(reg, w)
+                               : decode_memory(rm, (disp_hi << 8) | disp_lo);
+                if (src == nullptr) {
+                    return 1;
+                }
+                dst = (d == 0) ? decode_memory(rm, (disp_hi << 8) | disp_lo)
+                               : decode_register(reg, w);
+                if (dst == nullptr) {
+                    return 1;
+                }
+            } break;
+            case 0b11: {
+                src = (d == 0) ? decode_register(reg, w) : decode_register(rm, w);
+                if (src == nullptr) {
+                    return 1;
+                }
+                dst = (d == 0) ? decode_register(rm, w) : decode_register(reg, w);
+                if (dst == nullptr) {
+                    return 1;
+                }
+            } break;
             }
 
-            // Assign the source and destination registers
-            const char *src = (d == 0) ? decode_register(reg, w) : decode_register(rm, w);
-            if (src == nullptr) {
-                printf("Unable to decode source register\n");
-                return 1;
-            }
-            const char *dst = (d == 0) ? decode_register(rm, w) : decode_register(reg, w);
-            if (src == nullptr) {
-                printf("Unable to decode destination register\n");
-                return 1;
-            }
-
-            // Print the decoded instruction
             printf("mov %s, %s\n", dst, src);
         } else if (((byte1 >> 4) & 0b00001111) == 0b1011) {
+            printf("Aslan\n");
+            char data_lo = fgetc(fptr);
+
+            char w = (byte1 >> 3) & 0b00000001;
+
+            char reg = byte1 & 0b00000111;
+
+            if (w == 1) {
+                char data_hi = fgetc(fptr);
+                // ...
+            } else {
+                // ...
+            }
         }
+
+        printf("--------------------\n");
     }
     fclose(fptr);
 
