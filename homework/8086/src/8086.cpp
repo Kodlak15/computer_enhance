@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <stdio.h>
 
 // https://codeberg.org/bolt/8086-Users-Manual/src/branch/main/INTEL_The-8086-Family-Users-Manual.pdf
@@ -34,7 +35,7 @@ const char *decode_register(char byte, char w) {
     return nullptr;
 }
 
-const char *decode_memory(char byte, int disp) {
+const char *decode_memory(char byte, uint16_t disp) {
     switch (byte) {
     case 0b000: {
         if (disp > 0) {
@@ -91,7 +92,13 @@ const char *decode_memory(char byte, int disp) {
         }
     } break;
     case 0b110: {
-        // DIRECT ADDRESS (???)
+        if (disp > 0) {
+            static char buf[32];
+            sprintf(buf, "[bp + %d]", disp);
+            return buf;
+        } else {
+            return "[bp]";
+        }
     } break;
     case 0b111: {
         if (disp > 0) {
@@ -122,8 +129,8 @@ int decode_instructions(char *path) {
 
     char byte1;
     while ((byte1 = fgetc(fptr)) != EOF) {
-        print_byte_as_bits(byte1);
-        putchar('\n');
+        // print_byte_as_bits(byte1);
+        // putchar('\n');
         if (((byte1 >> 2) & 0b00111111) == 0b100010) {
             // The d bit tells us which direction the data moves
             char d = byte1 & 0b00000010;
@@ -173,8 +180,8 @@ int decode_instructions(char *path) {
                 }
             } break;
             case 0b10: {
-                char disp_lo = fgetc(fptr);
-                char disp_hi = fgetc(fptr);
+                uint8_t disp_lo = fgetc(fptr);
+                uint8_t disp_hi = fgetc(fptr);
                 src = (d == 0) ? decode_register(reg, w)
                                : decode_memory(rm, (disp_hi << 8) | disp_lo);
                 if (src == nullptr) {
@@ -200,22 +207,22 @@ int decode_instructions(char *path) {
 
             printf("mov %s, %s\n", dst, src);
         } else if (((byte1 >> 4) & 0b00001111) == 0b1011) {
-            printf("Aslan\n");
-            char data_lo = fgetc(fptr);
-
             char w = (byte1 >> 3) & 0b00000001;
-
             char reg = byte1 & 0b00000111;
 
+            const char *dst;
             if (w == 1) {
-                char data_hi = fgetc(fptr);
-                // ...
+                int16_t data_lo = fgetc(fptr);
+                int16_t data_hi = fgetc(fptr);
+                int16_t src = (data_hi << 8) | data_lo;
+                dst = decode_register(reg, 1);
+                printf("mov %s, %d\n", dst, src);
             } else {
-                // ...
+                int8_t data_lo = fgetc(fptr);
+                dst = decode_register(reg, 0);
+                printf("mov %s, %d\n", dst, data_lo);
             }
         }
-
-        printf("--------------------\n");
     }
     fclose(fptr);
 
