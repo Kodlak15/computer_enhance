@@ -93,6 +93,10 @@ int main(void)
             u32 RepCount = 1024*1024;
             u32 ChainCount = RepCount / ChainLength;
             
+            // NOTE(casey): Remultiply here just to make sure we count 
+            // our statistics fairly for divides with remainders
+            RepCount = ChainCount * ChainLength;
+            
             SetRowLabel(&TestSeries, "%u", ChainLength);
             SetColumnLabel(&TestSeries, "FMADepChain");
             
