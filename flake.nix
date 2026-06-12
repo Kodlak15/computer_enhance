@@ -19,7 +19,7 @@
       }: {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            odin
+            gcc
             nasm
             xxd
           ];
