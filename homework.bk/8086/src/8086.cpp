@@ -125,12 +125,8 @@ int decode_instructions(char *path) {
 
     printf("bits 16\n\n");
 
-    // NOTE should watch https://www.computerenhance.com/p/decoding-multiple-instructions-and again
-
     char byte1;
     while ((byte1 = fgetc(fptr)) != EOF) {
-        // print_byte_as_bits(byte1);
-        // putchar('\n');
         if (((byte1 >> 2) & 0b00111111) == 0b100010) {
             // The d bit tells us which direction the data moves
             char d = byte1 & 0b00000010;
@@ -153,9 +149,6 @@ int decode_instructions(char *path) {
             const char *src;
             // Register or memory location the data is moving to
             const char *dst;
-
-            // print_byte_as_bits(mod);
-            // putchar('\n');
 
             switch (mod) {
             case 0b00: {

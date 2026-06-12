@@ -19,20 +19,13 @@
       }: {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            gcc
-            gccNGPackages_15.libstdcxx
-            gdb
-            gdb-dashboard
-
-            go
-            python3
-
+            odin
             nasm
             xxd
           ];
 
           shellHook = ''
-            exec zsh -c zellij
+            exec ${pkgs.zsh}/bin/zsh -c ${pkgs.zellij}/bin/zellij
           '';
         };
       };
