@@ -128,7 +128,7 @@ BreakFunctionDefinitionParameters: false
 BreakInheritanceList: BeforeColon
 BreakStringLiterals: true
 BreakTemplateDeclarations: MultiLine
-ColumnLimit: 100
+ColumnLimit: 80
 CommentPragmas: "^ IWYU pragma:"
 CompactNamespaces: false
 ConstructorInitializerIndentWidth: 4
@@ -171,7 +171,6 @@ IndentExternBlock: AfterExternBlock
 IndentGotoLabels: true
 IndentPPDirectives: None
 IndentRequiresClause: true
-# IndentWidth: 2
 IndentWidth: 4
 IndentWrappedFunctionNames: false
 InsertBraces: false
@@ -199,8 +198,7 @@ MainIncludeChar: Quote
 MaxEmptyLinesToKeep: 1
 NamespaceIndentation: None
 ObjCBinPackProtocolList: Auto
-# ObjCBlockIndentWidth: 2
-ObjCBlockIndentWidth: 4
+ObjCBlockIndentWidth: 2
 ObjCBreakBeforeNestedBlockParam: true
 ObjCSpaceAfterProperty: false
 ObjCSpaceBeforeProtocolList: true
@@ -295,5 +293,5 @@ WhitespaceSensitiveMacros:
   - PP_STRINGIZE
   - STRINGIZE
 WrapNamespaceBodyWithEmptyLines: Leave
----
+...
 
