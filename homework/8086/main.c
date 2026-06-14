@@ -1,7 +1,11 @@
 #include <stdio.h>
 
 int disassemble(char *path);
-const char *decode_register(char r, char w);
+const char *decode_register(char reg, char w);
+const char *decode_effective_address(char rm, char mod, FILE *fptr);
+
+// See page 161:
+// https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
 
 int main(int argc, char *argv[]) {
     if (argc <= 1) {
@@ -25,36 +29,50 @@ int disassemble(char *path) {
     // assembly using a diff tool.
     printf("bits 16\n\n");
 
-    char b1, b2, d, w, mod, reg, rm;
+    char b1;
     while ((b1 = fgetc(fptr)) != EOF) {
+        // Register/memory to/from register
         if (((b1 >> 2) & 0b00111111) == 0b100010) {
-            d = b1 & 0b00000010;
-            w = b1 & 0b00000001;
-            b2 = fgetc(fptr);
-            mod = (b2 >> 6) & 0b00000011;
-            reg = (b2 >> 3) & 0b00000111;
-            rm = b2 & 0b00000111;
+            char d = b1 & 0b00000010;
+            char w = b1 & 0b00000001;
+            char b2 = fgetc(fptr);
+            char mod = (b2 >> 6) & 0b00000011;
+            char reg = (b2 >> 3) & 0b00000111;
+            char rm = b2 & 0b00000111;
 
             const char *src;
             const char *dst;
-            if (d == 0) {
-                src = decode_register(reg, w);
-                dst = decode_register(rm, w);
+
+            if (mod == 0b11) {
+                if (d == 0) {
+                    src = decode_register(reg, w);
+                    dst = decode_register(rm, w);
+                } else {
+                    src = decode_register(rm, w);
+                    dst = decode_register(reg, w);
+                }
             } else {
-                src = decode_register(rm, w);
-                dst = decode_register(reg, w);
+                if (d == 0) {
+                    src = decode_register(reg, w);
+                    dst = decode_effective_address(rm, mod, fptr);
+                } else {
+                    src = decode_register(reg, w);
+                    dst = decode_effective_address(rm, mod, fptr);
+                }
             }
 
             printf("mov %s, %s\n", dst, src);
         }
+
+        // Immediate to register/memory
     }
 
     fclose(fptr);
     return 0;
 }
 
-const char *decode_register(char r, char w) {
-    switch (r) {
+const char *decode_register(char reg, char w) {
+    switch (reg) {
         case 0b000:
             return w == 0 ? "al" : "ax";
         case 0b001:
@@ -74,4 +92,100 @@ const char *decode_register(char r, char w) {
     }
 
     return 0;
+}
+
+const char *decode_effective_address(char rm, char mod, FILE *fptr) {
+    static char buf[16];
+
+    switch (mod) {
+        case 0b00: {
+            switch (rm) {
+                case 0b000: {
+                    sprintf(buf, "[bx + si]");
+                }
+                case 0b001: {
+                    sprintf(buf, "[bx + di]");
+                }
+                case 0b010: {
+                    sprintf(buf, "[bp + si]");
+                }
+                case 0b011: {
+                    sprintf(buf, "[bp + di]");
+                }
+                case 0b100: {
+                    sprintf(buf, "[si]");
+                }
+                case 0b101: {
+                    sprintf(buf, "[di]");
+                }
+                case 0b110: {
+                    sprintf(buf, "%d", rm);
+                }
+                case 0b111: {
+                    sprintf(buf, "[bx]");
+                }
+            }
+        };
+        case 0b01: {
+            char dlo = fgetc(fptr);
+            switch (rm) {
+                case 0b000: {
+                    sprintf(buf, "[bx + si + %d]", dlo);
+                }
+                case 0b001: {
+                    sprintf(buf, "[bx + di + %d]", dlo);
+                }
+                case 0b010: {
+                    sprintf(buf, "[bp + si + %d]", dlo);
+                }
+                case 0b011: {
+                    sprintf(buf, "[bp + di + %d]", dlo);
+                }
+                case 0b100: {
+                    sprintf(buf, "[si + %d]", dlo);
+                }
+                case 0b101: {
+                    sprintf(buf, "[di + %d]", dlo);
+                }
+                case 0b110: {
+                    sprintf(buf, "[bp + %d]", dlo);
+                }
+                case 0b111: {
+                    sprintf(buf, "[bx + %d]", dlo);
+                }
+            };
+        }
+        case 0b10: {
+            char dlo = fgetc(fptr);
+            char dhi = fgetc(fptr);
+            switch (rm) {
+                case 0b000: {
+                    sprintf(buf, "[bx + si + %d]", dlo + dhi);
+                }
+                case 0b001: {
+                    sprintf(buf, "[bx + di + %d]", dlo + dhi);
+                }
+                case 0b010: {
+                    sprintf(buf, "[bp + si + %d]", dlo + dhi);
+                }
+                case 0b011: {
+                    sprintf(buf, "[bp + di + %d]", dlo + dhi);
+                }
+                case 0b100: {
+                    sprintf(buf, "[si + %d]", dlo + dhi);
+                }
+                case 0b101: {
+                    sprintf(buf, "[di + %d]", dlo + dhi);
+                }
+                case 0b110: {
+                    sprintf(buf, "[bp + %d]", dlo + dhi);
+                }
+                case 0b111: {
+                    sprintf(buf, "[bx + %d]", dlo + dhi);
+                }
+            };
+        };
+    }
+
+    return buf;
 }
