@@ -1,8 +1,9 @@
+#include <stdint.h>
 #include <stdio.h>
 
-int disassemble(char *path);
-const char *decode_register(char reg, char w);
-const char *decode_effective_address(char rm, char mod, FILE *fptr);
+void disassemble_file(FILE *fptr);
+const char *decode_reg(unsigned char reg, unsigned char w);
+void decode_effective_address(char buf[], char rm, int16_t disp);
 
 // See page 161:
 // https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
@@ -13,179 +14,184 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    char *path = argv[1];
-    return disassemble(path);
-}
-
-int disassemble(char *path) {
-    FILE *fptr = fopen(path, "r");
-    if (fptr == NULL) {
-        printf("Unable to open file '%s'", path);
-        return 1;
-    }
-
     // Tell the assembler we are assembling for a 16 bit CPU so that the output
     // can be reassembled and automatically tested against the reference
     // assembly using a diff tool.
     printf("bits 16\n\n");
 
-    char b1;
-    while ((b1 = fgetc(fptr)) != EOF) {
-        // Register/memory to/from register
-        if (((b1 >> 2) & 0b00111111) == 0b100010) {
-            char d = b1 & 0b00000010;
-            char w = b1 & 0b00000001;
-            char b2 = fgetc(fptr);
-            char mod = (b2 >> 6) & 0b00000011;
-            char reg = (b2 >> 3) & 0b00000111;
-            char rm = b2 & 0b00000111;
-
-            const char *src;
-            const char *dst;
-
-            if (mod == 0b11) {
-                if (d == 0) {
-                    src = decode_register(reg, w);
-                    dst = decode_register(rm, w);
-                } else {
-                    src = decode_register(rm, w);
-                    dst = decode_register(reg, w);
-                }
-            } else {
-                if (d == 0) {
-                    src = decode_register(reg, w);
-                    dst = decode_effective_address(rm, mod, fptr);
-                } else {
-                    src = decode_register(reg, w);
-                    dst = decode_effective_address(rm, mod, fptr);
-                }
-            }
-
-            printf("mov %s, %s\n", dst, src);
-        }
-
-        // Immediate to register/memory
+    char *path = argv[1];
+    FILE *fptr = fopen(path, "rb");
+    if (fptr == NULL) {
+        printf("Unable to open file '%s'", path);
+        return 1;
     }
+
+    disassemble_file(fptr);
 
     fclose(fptr);
     return 0;
 }
 
-const char *decode_register(char reg, char w) {
+void disassemble_file(FILE *fptr) {
+    int b1;
+    while ((b1 = fgetc(fptr)) != EOF) {
+        if (((b1 >> 2) & 0b00111111) == 0b100010) {
+            // Register/memory to/from register
+            unsigned char d = (b1 >> 1) & 0b00000001;
+            unsigned char w = b1 & 0b00000001;
+            int b2 = fgetc(fptr);
+            unsigned char mod = (b2 >> 6) & 0b00000011;
+            unsigned char reg = (b2 >> 3) & 0b00000111;
+            unsigned char rm = b2 & 0b00000111;
+
+            char rm_buf[32];
+            switch (mod) {
+                case 0b00: {
+                    if (rm == 0b110) {
+                        char disp_lo = fgetc(fptr);
+                        char disp_hi = fgetc(fptr);
+                        int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
+                        snprintf(rm_buf, sizeof(rm_buf), "[%d]", disp);
+                    } else {
+                        decode_effective_address(rm_buf, rm, 0);
+                    }
+                } break;
+                case 0b01: {
+                    int16_t disp = (int8_t)fgetc(fptr);
+                    decode_effective_address(rm_buf, rm, disp);
+                } break;
+                case 0b10: {
+                    char disp_lo = fgetc(fptr);
+                    char disp_hi = fgetc(fptr);
+                    int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
+                    decode_effective_address(rm_buf, rm, disp);
+                } break;
+                case 0b11: {
+                    snprintf(rm_buf, sizeof(rm_buf), "%s", decode_reg(rm, w));
+                } break;
+            }
+
+            const char *src;
+            const char *dst;
+            if (d == 0) {
+                src = decode_reg(reg, w);
+                dst = rm_buf;
+            } else {
+                src = rm_buf;
+                dst = decode_reg(reg, w);
+            }
+
+            printf("mov %s, %s\n", dst, src);
+        } else if (((b1 >> 4) & 0b00001111) == 0b00001011) {
+            // Immediate to register
+            unsigned char w = (b1 >> 2) & 0b00000001;
+            unsigned char reg = b1 & 0b00000111;
+            int b2 = fgetc(fptr);
+
+            const char *src;
+            int16_t data;
+            if (w == 0) {
+                src = decode_reg(reg, 0);
+                data = (int8_t)b2;
+            } else {
+                int b3 = fgetc(fptr);
+                src = decode_reg(reg, 1);
+                data = (int16_t)((int16_t)b2 | ((int16_t)b3 << 8));
+            }
+
+            printf("mov %s, %d\n", src, data);
+        }
+    }
+}
+
+const char *decode_reg(unsigned char reg, unsigned char w) {
     switch (reg) {
-        case 0b000:
+        case 0b000: {
             return w == 0 ? "al" : "ax";
-        case 0b001:
+        } break;
+        case 0b001: {
             return w == 0 ? "cl" : "cx";
-        case 0b010:
+        } break;
+        case 0b010: {
             return w == 0 ? "dl" : "dx";
-        case 0b011:
+        }; break;
+        case 0b011: {
             return w == 0 ? "bl" : "bx";
-        case 0b100:
+        } break;
+        case 0b100: {
             return w == 0 ? "ah" : "sp";
-        case 0b101:
+        } break;
+        case 0b101: {
             return w == 0 ? "ch" : "bp";
-        case 0b110:
+        } break;
+        case 0b110: {
             return w == 0 ? "dh" : "si";
-        case 0b111:
+        } break;
+        case 0b111: {
             return w == 0 ? "bh" : "di";
+        } break;
     }
 
     return 0;
 }
 
-const char *decode_effective_address(char rm, char mod, FILE *fptr) {
-    static char buf[16];
-
-    switch (mod) {
-        case 0b00: {
-            switch (rm) {
-                case 0b000: {
-                    sprintf(buf, "[bx + si]");
-                }
-                case 0b001: {
-                    sprintf(buf, "[bx + di]");
-                }
-                case 0b010: {
-                    sprintf(buf, "[bp + si]");
-                }
-                case 0b011: {
-                    sprintf(buf, "[bp + di]");
-                }
-                case 0b100: {
-                    sprintf(buf, "[si]");
-                }
-                case 0b101: {
-                    sprintf(buf, "[di]");
-                }
-                case 0b110: {
-                    sprintf(buf, "%d", rm);
-                }
-                case 0b111: {
-                    sprintf(buf, "[bx]");
-                }
+void decode_effective_address(char buf[], char rm, int16_t disp) {
+    switch (rm) {
+        case 0b000: {
+            if (disp == 0) {
+                snprintf(buf, 32, "[bx + si]");
+            } else {
+                snprintf(buf, 32, "[bx + si + %d]", disp);
             }
-        };
-        case 0b01: {
-            char dlo = fgetc(fptr);
-            switch (rm) {
-                case 0b000: {
-                    sprintf(buf, "[bx + si + %d]", dlo);
-                }
-                case 0b001: {
-                    sprintf(buf, "[bx + di + %d]", dlo);
-                }
-                case 0b010: {
-                    sprintf(buf, "[bp + si + %d]", dlo);
-                }
-                case 0b011: {
-                    sprintf(buf, "[bp + di + %d]", dlo);
-                }
-                case 0b100: {
-                    sprintf(buf, "[si + %d]", dlo);
-                }
-                case 0b101: {
-                    sprintf(buf, "[di + %d]", dlo);
-                }
-                case 0b110: {
-                    sprintf(buf, "[bp + %d]", dlo);
-                }
-                case 0b111: {
-                    sprintf(buf, "[bx + %d]", dlo);
-                }
-            };
-        }
-        case 0b10: {
-            char dlo = fgetc(fptr);
-            char dhi = fgetc(fptr);
-            switch (rm) {
-                case 0b000: {
-                    sprintf(buf, "[bx + si + %d]", dlo + dhi);
-                }
-                case 0b001: {
-                    sprintf(buf, "[bx + di + %d]", dlo + dhi);
-                }
-                case 0b010: {
-                    sprintf(buf, "[bp + si + %d]", dlo + dhi);
-                }
-                case 0b011: {
-                    sprintf(buf, "[bp + di + %d]", dlo + dhi);
-                }
-                case 0b100: {
-                    sprintf(buf, "[si + %d]", dlo + dhi);
-                }
-                case 0b101: {
-                    sprintf(buf, "[di + %d]", dlo + dhi);
-                }
-                case 0b110: {
-                    sprintf(buf, "[bp + %d]", dlo + dhi);
-                }
-                case 0b111: {
-                    sprintf(buf, "[bx + %d]", dlo + dhi);
-                }
-            };
-        };
+        } break;
+        case 0b001: {
+            if (disp == 0) {
+                snprintf(buf, 32, "[bx + di]");
+            } else {
+                snprintf(buf, 32, "[bx + di + %d]", disp);
+            }
+        } break;
+        case 0b010: {
+            if (disp == 0) {
+                snprintf(buf, 32, "[bp + si]");
+            } else {
+                snprintf(buf, 32, "[bp + si + %d]", disp);
+            }
+        } break;
+        case 0b011: {
+            if (disp == 0) {
+                snprintf(buf, 32, "[bp + di]");
+            } else {
+                snprintf(buf, 32, "[bp + di + %d]", disp);
+            }
+        } break;
+        case 0b100: {
+            if (disp == 0) {
+                snprintf(buf, 32, "[si]");
+            } else {
+                snprintf(buf, 32, "[si + %d]", disp);
+            }
+        } break;
+        case 0b101: {
+            if (disp == 0) {
+                snprintf(buf, 32, "[di]");
+            } else {
+                snprintf(buf, 32, "[di + %d]", disp);
+            }
+        } break;
+        case 0b110: {
+            if (disp == 0) {
+                snprintf(buf, 32, "[bp]");
+            } else {
+                snprintf(buf, 32, "[bp + %d]", disp);
+            }
+        } break;
+        case 0b111: {
+            if (disp == 0) {
+                snprintf(buf, 32, "[bx]");
+            } else {
+                snprintf(buf, 32, "[bx + %d]", disp);
+            }
+        } break;
     }
-
-    return buf;
 }
