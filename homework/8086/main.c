@@ -48,8 +48,8 @@ void disassemble_file(FILE *fptr) {
             switch (mod) {
                 case 0b00: {
                     if (rm == 0b110) {
-                        char disp_lo = fgetc(fptr);
-                        char disp_hi = fgetc(fptr);
+                        int disp_lo = fgetc(fptr);
+                        int disp_hi = fgetc(fptr);
                         int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
                         snprintf(rm_buf, sizeof(rm_buf), "[%d]", disp);
                     } else {
@@ -61,8 +61,8 @@ void disassemble_file(FILE *fptr) {
                     decode_effective_address(rm_buf, rm, disp);
                 } break;
                 case 0b10: {
-                    char disp_lo = fgetc(fptr);
-                    char disp_hi = fgetc(fptr);
+                    int disp_lo = fgetc(fptr);
+                    int disp_hi = fgetc(fptr);
                     int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
                     decode_effective_address(rm_buf, rm, disp);
                 } break;
@@ -84,7 +84,7 @@ void disassemble_file(FILE *fptr) {
             printf("mov %s, %s\n", dst, src);
         } else if (((b1 >> 4) & 0b00001111) == 0b00001011) {
             // Immediate to register
-            unsigned char w = (b1 >> 2) & 0b00000001;
+            unsigned char w = (b1 >> 3) & 0b00000001;
             unsigned char reg = b1 & 0b00000111;
             int b2 = fgetc(fptr);
 
