@@ -2,8 +2,8 @@
 #include <stdio.h>
 
 void disassemble_file(FILE *fptr);
-const char *decode_reg(unsigned char reg, unsigned char w);
-void decode_effective_address(char buf[], char rm, int16_t disp);
+const char *decode_reg(unsigned char reg, int is_word);
+const char *decode_effective_address(char rm);
 
 // See page 161:
 // https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
@@ -13,6 +13,7 @@ void decode_effective_address(char buf[], char rm, int16_t disp);
 // 000000dw - add
 // 001010dw - sub
 // 001110dw - cmp
+// 11000100 - mask
 
 // Immediate to register/memory
 // 1100011w - mov
@@ -53,250 +54,87 @@ int main(int argc, char *argv[]) {
 void disassemble_file(FILE *fptr) {
     int b1;
     while ((b1 = fgetc(fptr)) != EOF) {
-        if (0 == 0) {
-            // Register/memory to/from register
-            const char *op;
-            if ((b1 & 0b10101000) == 0b10001000) {
-                op = "mov";
-            } else if (((b1 >> 3) & 0b111) == 0b000) {
-                op = "add";
-            } else if (((b1 >> 3) & 0b111) == 0b101) {
-                op = "sub";
-            } else if (((b1 >> 3) & 0b111) == 0b111) {
-                op = "cmp";
-            }
-
-            unsigned char d = (b1 >> 1) & 0b00000001;
-            unsigned char w = b1 & 0b00000001;
-            int b2 = fgetc(fptr);
-            unsigned char mod = (b2 >> 6) & 0b00000011;
-            unsigned char reg = (b2 >> 3) & 0b00000111;
-            unsigned char rm = b2 & 0b00000111;
-
-            char rm_buf[32];
-            switch (mod) {
-                case 0b00: {
-                    if (rm == 0b110) {
-                        int disp_lo = fgetc(fptr);
-                        int disp_hi = fgetc(fptr);
-                        int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
-                        snprintf(rm_buf, sizeof(rm_buf), "[%d]", disp);
-                    } else {
-                        decode_effective_address(rm_buf, rm, 0);
-                    }
-                } break;
-                case 0b01: {
-                    int16_t disp = (int8_t)fgetc(fptr);
-                    decode_effective_address(rm_buf, rm, disp);
-                } break;
-                case 0b10: {
-                    int disp_lo = fgetc(fptr);
-                    int disp_hi = fgetc(fptr);
-                    int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
-                    decode_effective_address(rm_buf, rm, disp);
-                } break;
-                case 0b11: {
-                    snprintf(rm_buf, sizeof(rm_buf), "%s", decode_reg(rm, w));
-                } break;
-            }
-
-            const char *src;
-            const char *dst;
-            if (d == 0) {
-                src = decode_reg(reg, w);
-                dst = rm_buf;
-            } else {
-                src = rm_buf;
-                dst = decode_reg(reg, w);
-            }
-
-            printf("%s %s, %s\n", op, dst, src);
-        } else if (0 == 0) {
-            // Immediate to register/memory
-        } else if (0 == 0) {
-            // Memory to accumulator
-        } else if (0 == 0) {
-            // Immediate to register
-            unsigned char w = (b1 >> 3) & 0b00000001;
-            unsigned char reg = b1 & 0b00000111;
-            int data_lo = fgetc(fptr);
-
-            const char *src;
-            int16_t data;
-            if (w == 0) {
-                src = decode_reg(reg, 0);
-                data = (int8_t)data_lo;
-            } else {
-                int data_hi = fgetc(fptr);
-                src = decode_reg(reg, 1);
-                data = (int16_t)((int16_t)data_lo | ((int16_t)data_hi << 8));
-            }
-
-            printf("mov %s, %d\n", src, data);
+        if ((b1 & 0b11111100) == 0b10001000) {
+            // MOV register/memory to/from register
+            //
+            // decode_rm_reg(fptr, b1, mnemonic) -> todo
+        } else if ((b1 & 0b11000100) == 0b00000000) {
+            // ALU register/memory with register to either
+            //
+            // const char *mnemonic;
+            // if (Bits 3-5 == ADD pattern) {
+            //     mnemonic = "add";
+            // } else if (Bits 3-5 == SUB pattern) {
+            //     mnemonic = "sub";
+            // } else if (Bits 3-5 == CMP pattern) {
+            //     mnemonic = "cmp";
+            // }
+            //
+            // decode_rm_reg(fptr, b1, mnemonic) -> todo
         }
     }
 }
 
-// void disassemble_file(FILE *fptr) {
-//     int b1;
-//     while ((b1 = fgetc(fptr)) != EOF) {
-//         if (((b1 >> 2) & 0b00111111) == 0b100010) {
-//             // Register/memory to/from register
-//             unsigned char d = (b1 >> 1) & 0b00000001;
-//             unsigned char w = b1 & 0b00000001;
-//             int b2 = fgetc(fptr);
-//             unsigned char mod = (b2 >> 6) & 0b00000011;
-//             unsigned char reg = (b2 >> 3) & 0b00000111;
-//             unsigned char rm = b2 & 0b00000111;
-//
-//             char rm_buf[32];
-//             switch (mod) {
-//                 case 0b00: {
-//                     if (rm == 0b110) {
-//                         int disp_lo = fgetc(fptr);
-//                         int disp_hi = fgetc(fptr);
-//                         int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
-//                         snprintf(rm_buf, sizeof(rm_buf), "[%d]", disp);
-//                     } else {
-//                         decode_effective_address(rm_buf, rm, 0);
-//                     }
-//                 } break;
-//                 case 0b01: {
-//                     int16_t disp = (int8_t)fgetc(fptr);
-//                     decode_effective_address(rm_buf, rm, disp);
-//                 } break;
-//                 case 0b10: {
-//                     int disp_lo = fgetc(fptr);
-//                     int disp_hi = fgetc(fptr);
-//                     int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
-//                     decode_effective_address(rm_buf, rm, disp);
-//                 } break;
-//                 case 0b11: {
-//                     snprintf(rm_buf, sizeof(rm_buf), "%s", decode_reg(rm, w));
-//                 } break;
-//             }
-//
-//             const char *src;
-//             const char *dst;
-//             if (d == 0) {
-//                 src = decode_reg(reg, w);
-//                 dst = rm_buf;
-//             } else {
-//                 src = rm_buf;
-//                 dst = decode_reg(reg, w);
-//             }
-//
-//             printf("mov %s, %s\n", dst, src);
-//         } else if (((b1 >> 4) & 0b00001111) == 0b00001011) {
-//             // Immediate to register
-//             unsigned char w = (b1 >> 3) & 0b00000001;
-//             unsigned char reg = b1 & 0b00000111;
-//             int data_lo = fgetc(fptr);
-//
-//             const char *src;
-//             int16_t data;
-//             if (w == 0) {
-//                 src = decode_reg(reg, 0);
-//                 data = (int8_t)data_lo;
-//             } else {
-//                 int data_hi = fgetc(fptr);
-//                 src = decode_reg(reg, 1);
-//                 data = (int16_t)((int16_t)data_lo | ((int16_t)data_hi << 8));
-//             }
-//
-//             printf("mov %s, %d\n", src, data);
-//         }
-//     }
-// }
-
-const char *decode_reg(unsigned char reg, unsigned char w) {
+const char *decode_reg(unsigned char reg, int is_word) {
+    const char *r;
     switch (reg) {
         case 0b000: {
-            return w == 0 ? "al" : "ax";
+            r = is_word ? "ax" : "al";
         } break;
         case 0b001: {
-            return w == 0 ? "cl" : "cx";
+            r = is_word ? "cx" : "cl";
         } break;
         case 0b010: {
-            return w == 0 ? "dl" : "dx";
+            r = is_word ? "dx" : "dl";
         }; break;
         case 0b011: {
-            return w == 0 ? "bl" : "bx";
+            r = is_word ? "bx" : "bl";
         } break;
         case 0b100: {
-            return w == 0 ? "ah" : "sp";
+            r = is_word ? "sp" : "ah";
         } break;
         case 0b101: {
-            return w == 0 ? "ch" : "bp";
+            r = is_word ? "bp" : "ch";
         } break;
         case 0b110: {
-            return w == 0 ? "dh" : "si";
+            r = is_word ? "si" : "dh";
         } break;
         case 0b111: {
-            return w == 0 ? "bh" : "di";
+            r = is_word ? "di" : "bh";
         } break;
     }
 
-    return 0;
+    return r;
 }
 
-void decode_effective_address(char buf[], char rm, int16_t disp) {
+const char *decode_effective_address(char rm) {
+    const char *ea;
     switch (rm) {
         case 0b000: {
-            if (disp == 0) {
-                snprintf(buf, 32, "[bx + si]");
-            } else {
-                snprintf(buf, 32, "[bx + si + %d]", disp);
-            }
+            ea = "bx + si";
         } break;
         case 0b001: {
-            if (disp == 0) {
-                snprintf(buf, 32, "[bx + di]");
-            } else {
-                snprintf(buf, 32, "[bx + di + %d]", disp);
-            }
+            ea = "bx + di";
         } break;
         case 0b010: {
-            if (disp == 0) {
-                snprintf(buf, 32, "[bp + si]");
-            } else {
-                snprintf(buf, 32, "[bp + si + %d]", disp);
-            }
+            ea = "bp + si";
         } break;
         case 0b011: {
-            if (disp == 0) {
-                snprintf(buf, 32, "[bp + di]");
-            } else {
-                snprintf(buf, 32, "[bp + di + %d]", disp);
-            }
+            ea = "bp + di";
         } break;
         case 0b100: {
-            if (disp == 0) {
-                snprintf(buf, 32, "[si]");
-            } else {
-                snprintf(buf, 32, "[si + %d]", disp);
-            }
+            ea = "si";
         } break;
         case 0b101: {
-            if (disp == 0) {
-                snprintf(buf, 32, "[di]");
-            } else {
-                snprintf(buf, 32, "[di + %d]", disp);
-            }
+            ea = "di";
         } break;
         case 0b110: {
-            if (disp == 0) {
-                snprintf(buf, 32, "[bp]");
-            } else {
-                snprintf(buf, 32, "[bp + %d]", disp);
-            }
+            ea = "bp";
         } break;
         case 0b111: {
-            if (disp == 0) {
-                snprintf(buf, 32, "[bx]");
-            } else {
-                snprintf(buf, 32, "[bx + %d]", disp);
-            }
+            ea = "bx";
         } break;
     }
+
+    return ea;
 }
