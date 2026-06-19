@@ -8,28 +8,10 @@ void decode_rm_reg(FILE *fptr, int b1, const char *mnemonic);
 void decode_imm_reg(FILE *fptr, int b1, const char *mnemonic);
 void decode_imm_rm(FILE *fptr, int b1, int b2, const char *mnemonic);
 void decode_imm_accum(FILE *fptr, int b1, const char *mnemonic);
+void decode_cond_jmp(FILE *fptr, const char *mnemonic);
 
 // See page 161:
 // https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
-
-// Register/memory to/from register
-// 100010dw - mov
-// 000000dw - add
-// 001010dw - sub
-// 001110dw - cmp
-// 11000100 - mask
-
-// Immediate to register/memory
-// 1100011w - mov
-// 100000sw - add
-// 100000sw - sub
-// 100000sw - cmp
-
-// Memory to accumulator
-// 1010000w - mov
-// 0000010w - add
-// 0010110w - sub
-// 0011110w - cmp
 
 int main(int argc, char *argv[]) {
     if (argc <= 1) {
@@ -97,6 +79,43 @@ void disassemble_file(FILE *fptr) {
             }
 
             decode_imm_accum(fptr, b1, mnemonic);
+        } else if ((b1 & 11110000) == 0b01110000) {
+            const char *mnemonic;
+            if ((b1 & 0b00001111) == 0b00000100) {
+                mnemonic = "je";
+            } else if ((b1 & 0b00001111) == 0b00001100) {
+                mnemonic = "jl";
+            } else if ((b1 & 0b00001111) == 0b00001110) {
+                mnemonic = "jle";
+            } else if ((b1 & 0b00001111) == 0b00000010) {
+                mnemonic = "jb";
+            } else if ((b1 & 0b00001111) == 0b00000110) {
+                mnemonic = "jbe";
+            } else if ((b1 & 0b00001111) == 0b00001010) {
+                mnemonic = "jp";
+            } else if ((b1 & 0b00001111) == 0b00000000) {
+                mnemonic = "jo";
+            } else if ((b1 & 0b00001111) == 0b00001000) {
+                mnemonic = "js";
+            } else if ((b1 & 0b00001111) == 0b00000101) {
+                mnemonic = "jne";
+            } else if ((b1 & 0b00001111) == 0b00001101) {
+                mnemonic = "jnl";
+            } else if ((b1 & 0b00001111) == 0b00001111) {
+                mnemonic = "jg";
+            } else if ((b1 & 0b00001111) == 0b00000011) {
+                mnemonic = "jnb";
+            } else if ((b1 & 0b00001111) == 0b00000111) {
+                mnemonic = "ja";
+            } else if ((b1 & 0b00001111) == 0b00001011) {
+                mnemonic = "jnp";
+            } else if ((b1 & 0b00001111) == 0b00000001) {
+                mnemonic = "jno";
+            } else if ((b1 & 0b00001111) == 0b00001001) {
+                mnemonic = "jns";
+            }
+
+            decode_cond_jmp(fptr, mnemonic);
         }
     }
 }
@@ -302,7 +321,13 @@ void decode_imm_rm(FILE *fptr, int b1, int b2, const char *mnemonic) {
     }
 
     const char *dst = rm_buf;
-    printf("%s %s, %d\n", mnemonic, dst, data);
+    if (mod == 0b11) {
+        printf("%s %s, %d\n", mnemonic, dst, data);
+    } else if (w == 1) {
+        printf("word %s %s, %d\n", mnemonic, dst, data);
+    } else {
+        printf("byte %s %s, %d\n", mnemonic, dst, data);
+    }
 }
 
 void decode_imm_accum(FILE *fptr, int b1, const char *mnemonic) {
@@ -321,4 +346,9 @@ void decode_imm_accum(FILE *fptr, int b1, const char *mnemonic) {
     }
 
     printf("%s %s, %d\n", mnemonic, dst, data);
+}
+
+void decode_cond_jmp(FILE *fptr, const char *mnemonic) {
+    int inc = fgetc(fptr);
+    printf("%s %d\n", mnemonic, inc);
 }
