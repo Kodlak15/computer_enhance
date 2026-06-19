@@ -1,6 +1,7 @@
-#include <stdio.h>
-
 #include "decoder.h"
+#include "simulator.h"
+#include <stdio.h>
+#include <string.h>
 
 // See page 161:
 // https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
@@ -11,20 +12,29 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Tell the assembler we are assembling for a 16 bit CPU so that the output
-    // can be reassembled and automatically tested against the reference
-    // assembly using a diff tool.
-    printf("bits 16\n\n");
+    if (argc == 2) {
+        char *path = argv[1];
+        FILE *fptr = fopen(path, "rb");
+        if (fptr == NULL) {
+            printf("Unable to open file '%s'", path);
+            return 1;
+        }
 
-    char *path = argv[1];
-    FILE *fptr = fopen(path, "rb");
-    if (fptr == NULL) {
-        printf("Unable to open file '%s'", path);
-        return 1;
+        printf("bits 16\n\n");
+        decode_8086(fptr);
+        fclose(fptr);
+    } else if (strcmp(argv[1], "--exec") == 0) {
+        char *path = argv[2];
+        FILE *fptr = fopen(path, "rb");
+        if (fptr == NULL) {
+            printf("Unable to open file '%s'", path);
+            return 1;
+        }
+        simulate_8086(fptr);
+        fclose(fptr);
+    } else {
+        printf("Invalide argument: %s\n", argv[1]);
     }
 
-    decode_file(fptr);
-
-    fclose(fptr);
     return 0;
 }

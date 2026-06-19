@@ -1,8 +1,6 @@
-#include <stdio.h>
-
 #include "decoder.h"
 
-void decode_file(FILE *fptr) {
+void decode_8086(FILE *fptr) {
     int b1;
     while ((b1 = fgetc(fptr)) != EOF) {
         if ((b1 & 0b11111100) == 0b10001000) {
