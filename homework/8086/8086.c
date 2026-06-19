@@ -24,6 +24,7 @@ int main(int argc, char *argv[]) {
         decode_8086(fptr);
         fclose(fptr);
     } else if (strcmp(argv[1], "--exec") == 0) {
+        // TODO
         char *path = argv[2];
         FILE *fptr = fopen(path, "rb");
         if (fptr == NULL) {
@@ -33,7 +34,7 @@ int main(int argc, char *argv[]) {
         simulate_8086(fptr);
         fclose(fptr);
     } else {
-        printf("Invalide argument: %s\n", argv[1]);
+        printf("Invalid argument: %s\n", argv[1]);
     }
 
     return 0;

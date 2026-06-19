@@ -18,7 +18,7 @@ if [ ! -f "$TMP_DIR/.gitignore" ]; then
 fi
 
 # Build the disassembler if needed
-if [ ! -f "./8086" ] || [ "main.c" -nt "./8086" ]; then
+if [ ! -f "./8086" ] || [ "8086.c" -nt "./8086" ]; then
 	make
 fi
 
