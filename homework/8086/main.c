@@ -9,6 +9,7 @@ void decode_imm_reg(FILE *fptr, int b1, const char *mnemonic);
 void decode_imm_rm(FILE *fptr, int b1, int b2, const char *mnemonic);
 void decode_imm_accum(FILE *fptr, int b1, const char *mnemonic);
 void decode_cond_jmp(FILE *fptr, const char *mnemonic);
+void decode_loop(FILE *fptr, const char *mnemonic);
 
 // See page 161:
 // https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
@@ -116,6 +117,19 @@ void disassemble_file(FILE *fptr) {
             }
 
             decode_cond_jmp(fptr, mnemonic);
+        } else if ((b1 & 0b11111100) == 0b11100000) {
+            const char *mnemonic;
+            if ((b1 & 0b00000011) == 0b00000010) {
+                mnemonic = "loop";
+            } else if ((b1 & 0b00000011) == 0b00000001) {
+                mnemonic = "loopz";
+            } else if ((b1 & 0b00000011) == 0b00000000) {
+                mnemonic = "loopnz";
+            } else if ((b1 & 0b00000011) == 0b00000011) {
+                mnemonic = "jcxz";
+            }
+
+            decode_loop(fptr, mnemonic);
         }
     }
 }
@@ -349,6 +363,13 @@ void decode_imm_accum(FILE *fptr, int b1, const char *mnemonic) {
 }
 
 void decode_cond_jmp(FILE *fptr, const char *mnemonic) {
-    int inc = fgetc(fptr);
+    int b2 = fgetc(fptr);
+    int8_t inc = (int8_t)b2;
+    printf("%s %d\n", mnemonic, inc);
+}
+
+void decode_loop(FILE *fptr, const char *mnemonic) {
+    int b2 = fgetc(fptr);
+    int8_t inc = (int8_t)b2;
     printf("%s %d\n", mnemonic, inc);
 }
