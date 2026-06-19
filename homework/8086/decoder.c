@@ -1,4 +1,6 @@
 #include "decoder.h"
+#include <stdint.h>
+#include <stdio.h>
 
 void decode_8086(FILE *fptr) {
     int b1;

@@ -1,4 +1,5 @@
 #include "simulator.h"
+#include <stdio.h>
 
 void simulate_8086(FILE *fptr) {
     printf("Hello simulator!\n");
