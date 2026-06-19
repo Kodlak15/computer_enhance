@@ -2,14 +2,13 @@
 #include <stdint.h>
 #include <stdio.h>
 
-void decode_8086(FILE *fptr) {
-
+void decode_8086(FileContents file) {
     int b1;
-    while ((b1 = fgetc(fptr)) != EOF) {
+    while ((b1 = fgetc(file)) != EOF) {
         if ((b1 & 0b11111100) == 0b10001000) {
-            decode_rm_reg(fptr, b1, "mov");
+            decode_rm_reg(file, b1, "mov");
         } else if ((b1 & 0b11110000) == 0b10110000) {
-            decode_imm_reg(fptr, b1, "mov");
+            decode_imm_reg(file, b1, "mov");
         } else if ((b1 & 0b11000100) == 0b00000000) {
             const char *mnemonic;
             if ((b1 & 0b00111000) == 0b00000000) {
@@ -20,9 +19,9 @@ void decode_8086(FILE *fptr) {
                 mnemonic = "cmp";
             }
 
-            decode_rm_reg(fptr, b1, mnemonic);
+            decode_rm_reg(file, b1, mnemonic);
         } else if ((b1 & 0b11111100) == 0b10000000) {
-            int b2 = fgetc(fptr);
+            int b2 = fgetc(file);
 
             const char *mnemonic;
             if ((b2 & 0b00111000) == 0b00000000) {
@@ -33,7 +32,7 @@ void decode_8086(FILE *fptr) {
                 mnemonic = "cmp";
             }
 
-            decode_imm_rm(fptr, b1, b2, mnemonic);
+            decode_imm_rm(file, b1, b2, mnemonic);
         } else if ((b1 & 0b11000100) == 0b00000100) {
             const char *mnemonic;
             if ((b1 & 0b00111000) == 0b00000000) {
@@ -44,7 +43,7 @@ void decode_8086(FILE *fptr) {
                 mnemonic = "cmp";
             }
 
-            decode_imm_accum(fptr, b1, mnemonic);
+            decode_imm_accum(file, b1, mnemonic);
         } else if ((b1 & 11110000) == 0b01110000) {
             const char *mnemonic;
             if ((b1 & 0b00001111) == 0b00000100) {
@@ -81,7 +80,7 @@ void decode_8086(FILE *fptr) {
                 mnemonic = "jns";
             }
 
-            decode_cond_jmp(fptr, mnemonic);
+            decode_cond_jmp(file, mnemonic);
         } else if ((b1 & 0b11111100) == 0b11100000) {
             const char *mnemonic;
             if ((b1 & 0b00000011) == 0b00000010) {
@@ -94,7 +93,7 @@ void decode_8086(FILE *fptr) {
                 mnemonic = "jcxz";
             }
 
-            decode_loop(fptr, mnemonic);
+            decode_loop(file, mnemonic);
         }
     }
 }
@@ -192,10 +191,10 @@ void decode_effective_address(char buf[], char rm, int16_t disp) {
     }
 }
 
-void decode_rm_reg(FILE *fptr, int b1, const char *mnemonic) {
+void decode_rm_reg(FileContents *file, int b1, const char *mnemonic) {
     unsigned char d = (b1 >> 1) & 0b00000001;
     unsigned char w = b1 & 0b00000001;
-    int b2 = fgetc(fptr);
+    int b2 = fgetc(file);
     unsigned char mod = (b2 >> 6) & 0b00000011;
     unsigned char reg = (b2 >> 3) & 0b00000111;
     unsigned char rm = b2 & 0b00000111;
@@ -204,8 +203,8 @@ void decode_rm_reg(FILE *fptr, int b1, const char *mnemonic) {
     switch (mod) {
         case 0b00: {
             if (rm == 0b110) {
-                int disp_lo = fgetc(fptr);
-                int disp_hi = fgetc(fptr);
+                int disp_lo = fgetc(file);
+                int disp_hi = fgetc(file);
                 int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
                 decode_effective_address(rm_buf, rm, disp);
             } else {
@@ -213,12 +212,12 @@ void decode_rm_reg(FILE *fptr, int b1, const char *mnemonic) {
             }
         } break;
         case 0b01: {
-            int16_t disp = (int8_t)fgetc(fptr);
+            int16_t disp = (int8_t)fgetc(file);
             decode_effective_address(rm_buf, rm, disp);
         } break;
         case 0b10: {
-            int disp_lo = fgetc(fptr);
-            int disp_hi = fgetc(fptr);
+            int disp_lo = fgetc(file);
+            int disp_hi = fgetc(file);
             int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
             decode_effective_address(rm_buf, rm, disp);
         } break;
@@ -240,14 +239,14 @@ void decode_rm_reg(FILE *fptr, int b1, const char *mnemonic) {
     printf("%s %s, %s\n", mnemonic, dst, src);
 }
 
-void decode_imm_reg(FILE *fptr, int b1, const char *mnemonic) {
+void decode_imm_reg(FileContents *file, int b1, const char *mnemonic) {
     unsigned char w = (b1 >> 3) & 0b00000001;
     unsigned char reg = b1 & 0b00000111;
 
-    int data_lo = fgetc(fptr);
+    int data_lo = fgetc(file);
     int16_t data;
     if (w == 1) {
-        int data_hi = fgetc(fptr);
+        int data_hi = fgetc(file);
         data = (int16_t)((int16_t)data_lo | ((int16_t)data_hi << 8));
     } else {
         data = (int8_t)data_lo;
@@ -257,7 +256,7 @@ void decode_imm_reg(FILE *fptr, int b1, const char *mnemonic) {
     printf("%s %s, %d\n", mnemonic, dst, data);
 }
 
-void decode_imm_rm(FILE *fptr, int b1, int b2, const char *mnemonic) {
+void decode_imm_rm(FileContents *file, int b1, int b2, const char *mnemonic) {
     unsigned char s = (b1 >> 1) & 0b00000001;
     unsigned char w = b1 & 0b00000001;
     unsigned char mod = (b2 >> 6) & 0b00000011;
@@ -267,8 +266,8 @@ void decode_imm_rm(FILE *fptr, int b1, int b2, const char *mnemonic) {
     switch (mod) {
         case 0b00: {
             if (rm == 0b110) {
-                int disp_lo = fgetc(fptr);
-                int disp_hi = fgetc(fptr);
+                int disp_lo = fgetc(file);
+                int disp_hi = fgetc(file);
                 int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
                 decode_effective_address(rm_buf, rm, disp);
             } else {
@@ -276,12 +275,12 @@ void decode_imm_rm(FILE *fptr, int b1, int b2, const char *mnemonic) {
             }
         } break;
         case 0b01: {
-            int16_t disp = (int8_t)fgetc(fptr);
+            int16_t disp = (int8_t)fgetc(file);
             decode_effective_address(rm_buf, rm, disp);
         } break;
         case 0b10: {
-            int disp_lo = fgetc(fptr);
-            int disp_hi = fgetc(fptr);
+            int disp_lo = fgetc(file);
+            int disp_hi = fgetc(file);
             int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
             decode_effective_address(rm_buf, rm, disp);
         } break;
@@ -290,10 +289,10 @@ void decode_imm_rm(FILE *fptr, int b1, int b2, const char *mnemonic) {
         } break;
     }
 
-    int data_lo = fgetc(fptr);
+    int data_lo = fgetc(file);
     int16_t data;
     if (s == 0 && w == 1) {
-        int data_hi = fgetc(fptr);
+        int data_hi = fgetc(file);
         data = (int16_t)((int16_t)data_lo | ((int16_t)data_hi << 8));
     } else {
         data = (int8_t)data_lo;
@@ -309,15 +308,15 @@ void decode_imm_rm(FILE *fptr, int b1, int b2, const char *mnemonic) {
     }
 }
 
-void decode_imm_accum(FILE *fptr, int b1, const char *mnemonic) {
+void decode_imm_accum(FileContents *file, int b1, const char *mnemonic) {
     unsigned char w = b1 & 0b00000001;
 
     const char *dst;
-    int data_lo = fgetc(fptr);
+    int data_lo = fgetc(file);
     int16_t data;
     if (w == 1) {
         dst = "ax";
-        int data_hi = fgetc(fptr);
+        int data_hi = fgetc(file);
         data = (int16_t)((int16_t)data_lo | ((int16_t)data_hi << 8));
     } else {
         dst = "al";
@@ -327,14 +326,14 @@ void decode_imm_accum(FILE *fptr, int b1, const char *mnemonic) {
     printf("%s %s, %d\n", mnemonic, dst, data);
 }
 
-void decode_cond_jmp(FILE *fptr, const char *mnemonic) {
-    int b2 = fgetc(fptr);
+void decode_cond_jmp(FileContents *file, const char *mnemonic) {
+    int b2 = fgetc(file);
     int8_t inc = (int8_t)b2;
     printf("%s %d\n", mnemonic, inc);
 }
 
-void decode_loop(FILE *fptr, const char *mnemonic) {
-    int b2 = fgetc(fptr);
+void decode_loop(FileContents *file, const char *mnemonic) {
+    int b2 = fgetc(file);
     int8_t inc = (int8_t)b2;
     printf("%s %d\n", mnemonic, inc);
 }
