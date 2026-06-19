@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-void disassemble_file(FILE *fptr);
+void decode_file(FILE *fptr);
 const char *decode_reg(unsigned char reg, int is_word);
 void decode_effective_address(char buf[], char rm, int16_t disp);
 void decode_rm_reg(FILE *fptr, int b1, const char *mnemonic);
@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    disassemble_file(fptr);
+    decode_file(fptr);
 
     fclose(fptr);
     return 0;
@@ -338,9 +338,9 @@ void decode_imm_rm(FILE *fptr, int b1, int b2, const char *mnemonic) {
     if (mod == 0b11) {
         printf("%s %s, %d\n", mnemonic, dst, data);
     } else if (w == 1) {
-        printf("word %s %s, %d\n", mnemonic, dst, data);
+        printf("%s word %s, %d\n", mnemonic, dst, data);
     } else {
-        printf("byte %s %s, %d\n", mnemonic, dst, data);
+        printf("%s byte %s, %d\n", mnemonic, dst, data);
     }
 }
 
