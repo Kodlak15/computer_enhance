@@ -1,6 +1,5 @@
-#include "decoder.h"
-#include "helpers.h"
-#include "simulator.h"
+#include "sim86_lib.h"
+
 #include <stdio.h>
 #include <string.h>
 
@@ -34,35 +33,14 @@ int main(int argc, char *argv[]) {
 
     switch (mode) {
         case Decode:
-            decode_8086(file);
+            // todo
+            printf("Decoding 8086\n");
+            break;
         case Simulate:
-            simulate_8086(file);
+            // todo
+            printf("Simulating 8086\n");
+            break;
     }
-
-    // if (argc == 2) {
-    //     char *path = argv[1];
-    //     FILE *fptr = fopen(path, "rb");
-    //     if (fptr == NULL) {
-    //         printf("Unable to open file '%s'", path);
-    //         return 1;
-    //     }
-    //
-    //     printf("bits 16\n\n");
-    //     decode_8086(fptr);
-    //     fclose(fptr);
-    // } else if (strcmp(argv[1], "--exec") == 0) {
-    //     // TODO
-    //     char *path = argv[2];
-    //     FILE *fptr = fopen(path, "rb");
-    //     if (fptr == NULL) {
-    //         printf("Unable to open file '%s'", path);
-    //         return 1;
-    //     }
-    //     simulate_8086(fptr);
-    //     fclose(fptr);
-    // } else {
-    //     printf("Invalid argument: %s\n", argv[1]);
-    // }
 
     return 0;
 }
