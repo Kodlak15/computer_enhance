@@ -1,4 +1,4 @@
-#include "sim86_lib.h"
+#include "8086_lib.h"
 
 #include <stdio.h>
 #include <stdlib.h>
