@@ -4,6 +4,8 @@
 DecoderResult decode(FileContents file) {
     DecoderResult result = {NULL, 0};
 
+    // Maximum number of bytes that need to be allocated is the total number of bytes that are read from the file
+    // multiplied by the size of `Instruction`
     Instruction *instructions = malloc(file.size * sizeof(*instructions));
 
     size_t offset = 0;
@@ -23,7 +25,7 @@ DecoderResult decode(FileContents file) {
 Instruction decode_instruction(FileContents file, size_t offset, size_t *consumed) {
     Instruction instruction;
 
-    // todo
+    // TODO: Check opcodes and do all of the stuff I was doing before right here
 
     return instruction;
 }
