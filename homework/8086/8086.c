@@ -1,4 +1,4 @@
-#include "8086_lib.h"
+#include "8086_decoder.h"
 
 #include <stdio.h>
 
@@ -17,6 +17,8 @@ int main(int argc, char *argv[]) {
     if (!file.bytes) {
         return 1;
     }
+
+    DecoderResult decoded_result = decode(file);
 
     return 0;
 }
