@@ -20,5 +20,9 @@ int main(int argc, char *argv[]) {
 
     DecoderResult decoded_result = decode(file);
 
+    for (int i = 0; i < decoded_result.count; i++) {
+        print_instruction(decoded_result.instructions[i]);
+    }
+
     return 0;
 }

@@ -1,13 +1,7 @@
 #include "8086_decoder.h"
+#include <stdint.h>
 #include <stdlib.h>
 
-Instruction mov_rm_reg(FileContents file, size_t offset, size_t consumed);
-Instruction mov_imm_reg(FileContents file, size_t offset, size_t consumed);
-Instruction add_sub_cmp_rm_reg(FileContents file, size_t offset, size_t consumed);
-Instruction add_sub_cmp_imm_rm(FileContents file, size_t offset, size_t consumed);
-Instruction add_sub_cmp_imm_accum(FileContents file, size_t offset, size_t consumed);
-
-typedef Instruction (*OperationHandler)(FileContents file, size_t offset, size_t consumed);
 OperationHandler handler_table[256] = {
     // Add: Reg/memory with register to either
     [0x00] = add_sub_cmp_rm_reg,
@@ -84,19 +78,136 @@ DecoderResult decode(FileContents file) {
     return result;
 }
 
-// Instruction decode_instruction(FileContents file, size_t offset, size_t *consumed) {
-//     Instruction instruction;
-//
-//     // Check this out, seems really nice: https://gist.github.com/tweetandcode/8aa6e9ce3eee0b19fd9ab0ba3c0085a3
-//     // User basically created a lookup table for every possible first byte that called the appropriate function
-//
-//     uint8_t b1 = file.bytes[offset];
-//     if ((b1 & 0b11111100) == 0b10001000) {
-//     } else if ((b1 & 0b11111100) == 0b10000000) {
-//     } else if ((b1 & 0b11000100) == 0b00000100) {
-//     } else if ((b1 & 11110000) == 0b01110000) {
-//     } else if ((b1 & 0b11111100) == 0b11100000) {
-//     }
-//
-//     return instruction;
-// }
+Register decode_reg(uint8_t reg, uint8_t w) {
+    switch (reg) {
+        case 0x00: {
+            return w == 0 ? REGISTER_AL : REGISTER_AH;
+        };
+        case 0x01: {
+            return w == 0 ? REGISTER_CL : REGISTER_CX;
+        };
+        case 0x02: {
+            return w == 0 ? REGISTER_DL : REGISTER_DX;
+        };
+        case 0x03: {
+            return w == 0 ? REGISTER_BL : REGISTER_BX;
+        };
+        case 0x04: {
+            return w == 0 ? REGISTER_AH : REGISTER_SP;
+        };
+        case 0x05: {
+            return w == 0 ? REGISTER_CH : REGISTER_BP;
+        };
+        case 0x06: {
+            return w == 0 ? REGISTER_DH : REGISTER_SI;
+        };
+        case 0x07: {
+            return w == 0 ? REGISTER_BH : REGISTER_DI;
+        };
+        default: {
+            return REGISTER_UNDEFINED;
+        };
+    }
+}
+
+EffectiveAddressBase decode_effective_address_base(uint8_t rm) {
+    switch (rm) {
+        case 0x00: {
+            return EA_BASE_BX_SI;
+        };
+        case 0x01: {
+            return EA_BASE_BX_DI;
+        };
+        case 0x02: {
+            return EA_BASE_BP_SI;
+        };
+        case 0x03: {
+            return EA_BASE_BP_DI;
+        };
+        case 0x04: {
+            return EA_BASE_SI;
+        };
+        case 0x05: {
+            return EA_BASE_DI;
+        };
+        case 0x06: {
+            return EA_BASE_BP;
+        };
+        case 0x07: {
+            return EA_BASE_BX;
+        };
+        default: {
+            return EA_BASE_UNDEFINED;
+        };
+    }
+}
+
+Instruction mov_rm_reg(FileContents file, size_t offset, size_t consumed) {
+    Instruction result = {};
+
+    uint8_t b1 = file.bytes[offset++];
+    ++consumed;
+    uint8_t b2 = file.bytes[offset++];
+    ++consumed;
+
+    uint8_t d = (b1 >> 1) & 0x01;
+    uint8_t w = b1 & 0x01;
+    uint8_t mod = (b2 >> 6) & 0x03;
+    uint8_t reg = (b2 >> 3) & 0x04;
+    uint8_t rm = b2 & 0x04;
+
+    Operand rm_decoded;
+    switch (mod) {
+        case 0x00: {
+            if (rm == 0x03) {
+                uint8_t disp_lo = file.bytes[offset++];
+                ++consumed;
+                uint8_t disp_hi = file.bytes[offset++];
+                ++consumed;
+                int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
+
+                rm_decoded.type = OPERAND_TYPE_MEMORY;
+                rm_decoded.effective_address.base = EA_BASE_DIRECT;
+                rm_decoded.effective_address.displacement = disp;
+            } else {
+            }
+        } break;
+        case 0x01: {
+        } break;
+        case 0x10: {
+        } break;
+        case 0x11: {
+        } break;
+    }
+
+    Operand reg_decoded = {
+        OPERAND_TYPE_REGISTER,
+        decode_reg(reg, w),
+    };
+
+    return result;
+}
+
+Instruction mov_imm_reg(FileContents file, size_t offset, size_t consumed) {
+    Instruction result = {};
+
+    return result;
+}
+
+Instruction add_sub_cmp_rm_reg(FileContents file, size_t offset, size_t consumed) {
+    Instruction result = {};
+
+    return result;
+}
+
+Instruction add_sub_cmp_imm_rm(FileContents file, size_t offset, size_t consumed) {
+    Instruction result = {};
+
+    return result;
+}
+
+Instruction add_sub_cmp_imm_accum(FileContents file, size_t offset, size_t consumed) {
+    Instruction result = {};
+
+    return result;
+}

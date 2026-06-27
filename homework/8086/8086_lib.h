@@ -49,6 +49,7 @@ typedef enum {
     REGISTER_SI,
     REGISTER_BH,
     REGISTER_DI,
+    REGISTER_UNDEFINED,
 } Register;
 
 typedef enum {
@@ -59,7 +60,9 @@ typedef enum {
     EA_BASE_BP_DI,
     EA_BASE_SI,
     EA_BASE_DI,
+    EA_BASE_BP,
     EA_BASE_BX,
+    EA_BASE_UNDEFINED,
 } EffectiveAddressBase;
 
 typedef struct {
@@ -68,9 +71,10 @@ typedef struct {
 } EffectiveAddress;
 
 typedef enum {
-    OPERAND_TYPE_Register,
-    OPERAND_TYPE_Memory,
-    OPERAND_TYPE_Immediate,
+    OPERAND_TYPE_REGISTER,
+    OPERAND_TYPE_MEMORY,
+    OPERAND_TYPE_IMMEDIATE,
+    OPERAND_TYPE_NONE,
 } OperandType;
 
 typedef struct {
@@ -88,3 +92,6 @@ typedef struct {
 } Instruction;
 
 FileContents read_file(const char *path);
+const char *operation_as_str(Operation op);
+const char *operand_as_str(Operand op);
+void print_instruction(Instruction instruction);
