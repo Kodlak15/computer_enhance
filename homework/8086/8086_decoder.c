@@ -1,5 +1,6 @@
 #include "8086_decoder.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 OperationHandler handler_table[256] = {
@@ -67,7 +68,6 @@ DecoderResult decode(FileContents file) {
     size_t count = 0;
     while (offset < file.size) {
         size_t consumed = 0;
-        // Instruction instruction = decode_instruction(file, offset, &consumed);
         Instruction instruction = handler_table[file.bytes[offset]](file, offset, &consumed);
         instructions[count++] = instruction;
         offset += consumed;
@@ -143,12 +143,13 @@ EffectiveAddressBase decode_effective_address_base(uint8_t rm) {
 }
 
 Instruction mov_rm_reg(FileContents file, size_t offset, size_t *consumed) {
-    Instruction result = {};
+    Instruction instruction;
+    instruction.operation = OPERATION_MOV;
 
     uint8_t b1 = file.bytes[offset++];
-    ++consumed;
+    *consumed += 1;
     uint8_t b2 = file.bytes[offset++];
-    ++consumed;
+    *consumed += 1;
 
     uint8_t d = (b1 >> 1) & 0x01;
     uint8_t w = b1 & 0x01;
@@ -161,9 +162,9 @@ Instruction mov_rm_reg(FileContents file, size_t offset, size_t *consumed) {
         case 0x00: {
             if (rm == 0x03) {
                 uint8_t disp_lo = file.bytes[offset++];
-                ++consumed;
+                *consumed += 1;
                 uint8_t disp_hi = file.bytes[offset++];
-                ++consumed;
+                *consumed += 1;
                 int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
 
                 rm_decoded.type = OPERAND_TYPE_MEMORY;
@@ -174,18 +175,27 @@ Instruction mov_rm_reg(FileContents file, size_t offset, size_t *consumed) {
         } break;
         case 0x01: {
         } break;
-        case 0x10: {
+        case 0x02: {
         } break;
-        case 0x11: {
+        case 0x03: {
+            rm_decoded.type = OPERAND_TYPE_REGISTER;
+            rm_decoded.reg = decode_reg(rm, w);
         } break;
     }
 
-    Operand reg_decoded = {
-        OPERAND_TYPE_REGISTER,
-        decode_reg(reg, w),
-    };
+    Operand reg_decoded;
+    reg_decoded.type = OPERAND_TYPE_REGISTER;
+    reg_decoded.reg = decode_reg(reg, w);
 
-    return result;
+    if (d == 0) {
+        instruction.operands[0] = reg_decoded;
+        instruction.operands[1] = rm_decoded;
+    } else {
+        instruction.operands[0] = rm_decoded;
+        instruction.operands[1] = reg_decoded;
+    }
+
+    return instruction;
 }
 
 Instruction mov_imm_reg(FileContents file, size_t offset, size_t *consumed) {

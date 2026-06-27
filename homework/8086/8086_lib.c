@@ -113,6 +113,7 @@ const char *operand_as_str(Operand op) {
                     sprintf(buf, "cl");
                     break;
                 case REGISTER_CX:
+                    printf("Is this at least working?\n");
                     sprintf(buf, "cx");
                     break;
                 case REGISTER_DL:
@@ -125,6 +126,7 @@ const char *operand_as_str(Operand op) {
                     sprintf(buf, "bl");
                     break;
                 case REGISTER_BX:
+                    printf("Is this at least workinggggg?\n");
                     sprintf(buf, "bx");
                     break;
                 case REGISTER_AH:
@@ -235,12 +237,12 @@ const char *operand_as_str(Operand op) {
 }
 
 void print_instruction(Instruction instruction) {
-    Operand src = instruction.operands[0];
-    Operand dst = instruction.operands[1];
+    Operand op1 = instruction.operands[0];
+    Operand op2 = instruction.operands[1];
 
-    if (dst.type != OPERAND_TYPE_NONE) {
-        printf("%s %s, %s\n", operation_as_str(instruction.operation), operand_as_str(src), operand_as_str(dst));
+    if (op2.type != OPERAND_TYPE_NONE) {
+        printf("%s %s, %s\n", operation_as_str(instruction.operation), operand_as_str(op1), operand_as_str(op2));
     } else {
-        printf("%s %s\n", operation_as_str(instruction.operation), operand_as_str(src));
+        printf("%s %s\n", operation_as_str(instruction.operation), operand_as_str(op1));
     }
 }
