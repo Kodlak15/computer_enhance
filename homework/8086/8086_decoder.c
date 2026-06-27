@@ -68,7 +68,7 @@ DecoderResult decode(FileContents file) {
     while (offset < file.size) {
         size_t consumed = 0;
         // Instruction instruction = decode_instruction(file, offset, &consumed);
-        Instruction instruction = handler_table[file.bytes[offset]](file, offset, consumed);
+        Instruction instruction = handler_table[file.bytes[offset]](file, offset, &consumed);
         instructions[count++] = instruction;
         offset += consumed;
     }
@@ -142,7 +142,7 @@ EffectiveAddressBase decode_effective_address_base(uint8_t rm) {
     }
 }
 
-Instruction mov_rm_reg(FileContents file, size_t offset, size_t consumed) {
+Instruction mov_rm_reg(FileContents file, size_t offset, size_t *consumed) {
     Instruction result = {};
 
     uint8_t b1 = file.bytes[offset++];
@@ -188,25 +188,25 @@ Instruction mov_rm_reg(FileContents file, size_t offset, size_t consumed) {
     return result;
 }
 
-Instruction mov_imm_reg(FileContents file, size_t offset, size_t consumed) {
+Instruction mov_imm_reg(FileContents file, size_t offset, size_t *consumed) {
     Instruction result = {};
 
     return result;
 }
 
-Instruction add_sub_cmp_rm_reg(FileContents file, size_t offset, size_t consumed) {
+Instruction add_sub_cmp_rm_reg(FileContents file, size_t offset, size_t *consumed) {
     Instruction result = {};
 
     return result;
 }
 
-Instruction add_sub_cmp_imm_rm(FileContents file, size_t offset, size_t consumed) {
+Instruction add_sub_cmp_imm_rm(FileContents file, size_t offset, size_t *consumed) {
     Instruction result = {};
 
     return result;
 }
 
-Instruction add_sub_cmp_imm_accum(FileContents file, size_t offset, size_t consumed) {
+Instruction add_sub_cmp_imm_accum(FileContents file, size_t offset, size_t *consumed) {
     Instruction result = {};
 
     return result;
