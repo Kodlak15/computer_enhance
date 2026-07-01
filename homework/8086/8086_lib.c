@@ -97,8 +97,8 @@ const char *operation_as_str(Operation op) {
     }
 }
 
-const char *operand_as_str(Operand op) {
-    static char buf[32];
+char *operand_as_str(Operand op, char *buf, size_t size) {
+    // static char buf[32];
 
     switch (op.type) {
         case OPERAND_TYPE_REGISTER:
@@ -113,7 +113,6 @@ const char *operand_as_str(Operand op) {
                     sprintf(buf, "cl");
                     break;
                 case REGISTER_CX:
-                    printf("Is this at least working?\n");
                     sprintf(buf, "cx");
                     break;
                 case REGISTER_DL:
@@ -126,7 +125,6 @@ const char *operand_as_str(Operand op) {
                     sprintf(buf, "bl");
                     break;
                 case REGISTER_BX:
-                    printf("Is this at least workinggggg?\n");
                     sprintf(buf, "bx");
                     break;
                 case REGISTER_AH:
@@ -158,6 +156,7 @@ const char *operand_as_str(Operand op) {
                     sprintf(buf, "");
                     break;
             };
+            break;
         case OPERAND_TYPE_MEMORY:
             switch (op.effective_address.base) {
                 case EA_BASE_DIRECT:
@@ -224,6 +223,7 @@ const char *operand_as_str(Operand op) {
                     sprintf(buf, "");
                     break;
             };
+            break;
         case OPERAND_TYPE_IMMEDIATE:
             sprintf(buf, "%d", op.immediate);
             break;
@@ -240,9 +240,14 @@ void print_instruction(Instruction instruction) {
     Operand op1 = instruction.operands[0];
     Operand op2 = instruction.operands[1];
 
+    char src[32];
+    operand_as_str(op1, src, sizeof(src));
+    char dst[32];
+    operand_as_str(op2, dst, sizeof(dst));
+
     if (op2.type != OPERAND_TYPE_NONE) {
-        printf("%s %s, %s\n", operation_as_str(instruction.operation), operand_as_str(op1), operand_as_str(op2));
+        printf("%s %s, %s\n", operation_as_str(instruction.operation), dst, src);
     } else {
-        printf("%s %s\n", operation_as_str(instruction.operation), operand_as_str(op1));
+        printf("%s %s\n", operation_as_str(instruction.operation), src);
     }
 }

@@ -21,6 +21,7 @@ int main(int argc, char *argv[]) {
     DecoderResult decoded_result = decode(file);
 
     for (int i = 0; i < decoded_result.count; i++) {
+        printf("bits 16\n\n");
         print_instruction(decoded_result.instructions[i]);
     }
 

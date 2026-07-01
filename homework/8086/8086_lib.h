@@ -93,5 +93,5 @@ typedef struct {
 
 FileContents read_file(const char *path);
 const char *operation_as_str(Operation op);
-const char *operand_as_str(Operand op);
+char *operand_as_str(Operand op, char *buf, size_t size);
 void print_instruction(Instruction instruction);

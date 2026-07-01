@@ -154,13 +154,13 @@ Instruction mov_rm_reg(FileContents file, size_t offset, size_t *consumed) {
     uint8_t d = (b1 >> 1) & 0x01;
     uint8_t w = b1 & 0x01;
     uint8_t mod = (b2 >> 6) & 0x03;
-    uint8_t reg = (b2 >> 3) & 0x04;
-    uint8_t rm = b2 & 0x04;
+    uint8_t reg = (b2 >> 3) & 0x07;
+    uint8_t rm = b2 & 0x07;
 
     Operand rm_decoded;
     switch (mod) {
         case 0x00: {
-            if (rm == 0x03) {
+            if (rm == 0x06) {
                 uint8_t disp_lo = file.bytes[offset++];
                 *consumed += 1;
                 uint8_t disp_hi = file.bytes[offset++];
