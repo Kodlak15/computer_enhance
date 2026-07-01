@@ -81,7 +81,7 @@ DecoderResult decode(FileContents file) {
 Register decode_reg(uint8_t reg, uint8_t w) {
     switch (reg) {
         case 0x00: {
-            return w == 0 ? REGISTER_AL : REGISTER_AH;
+            return w == 0 ? REGISTER_AL : REGISTER_AX;
         };
         case 0x01: {
             return w == 0 ? REGISTER_CL : REGISTER_CX;
@@ -174,8 +174,23 @@ Instruction mov_rm_reg(FileContents file, size_t offset, size_t *consumed) {
             }
         } break;
         case 0x01: {
+            int16_t disp = file.bytes[offset++];
+            *consumed += 1;
+
+            rm_decoded.type = OPERAND_TYPE_MEMORY;
+            rm_decoded.effective_address.base = decode_effective_address_base(rm);
+            rm_decoded.effective_address.displacement = disp;
         } break;
         case 0x02: {
+            uint8_t disp_lo = file.bytes[offset++];
+            *consumed += 1;
+            uint8_t disp_hi = file.bytes[offset++];
+            *consumed += 1;
+            int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
+
+            rm_decoded.type = OPERAND_TYPE_MEMORY;
+            rm_decoded.effective_address.base = decode_effective_address_base(rm);
+            rm_decoded.effective_address.displacement = disp;
         } break;
         case 0x03: {
             rm_decoded.type = OPERAND_TYPE_REGISTER;

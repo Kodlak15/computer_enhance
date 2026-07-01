@@ -20,8 +20,9 @@ int main(int argc, char *argv[]) {
 
     DecoderResult decoded_result = decode(file);
 
+    // todo: separate decoder/simulator logic
+    printf("bits 16\n\n");
     for (int i = 0; i < decoded_result.count; i++) {
-        printf("bits 16\n\n");
         print_instruction(decoded_result.instructions[i]);
     }
 
