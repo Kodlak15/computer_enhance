@@ -315,11 +315,57 @@ Instruction add_sub_cmp_rm_reg(FileContents file, size_t offset, size_t *consume
 Instruction add_sub_cmp_imm_rm(FileContents file, size_t offset, size_t *consumed) {
     Instruction instruction;
 
+    uint8_t b1 = file.bytes[offset++];
+    *consumed += 1;
+    uint8_t b2 = file.bytes[offset++];
+    *consumed += 1;
+
+    uint8_t s = (b1 >> 1) & 0x01;
+    uint8_t w = b1 & 0x01;
+    uint8_t mod = (b2 >> 6) & 0x03;
+    uint8_t rm = b2 & 0x07;
+
+    size_t consumed_before = *consumed;
+    Operand rm_decoded = decode_rm(file, offset, consumed, rm, mod, w);
+    offset += *consumed - consumed_before; // update offset to reflect bytes read in decode_rm
+    Operand imm_decoded = decode_immediate(file, offset, consumed, w);
+
+    // TODO handle converting this part
+    // const char *dst = rm_buf;
+    // if (mod == 0b11) {
+    //     printf("%s %s, %d\n", mnemonic, dst, data);
+    // } else if (w == 1) {
+    //     printf("%s word %s, %d\n", mnemonic, dst, data);
+    // } else {
+    //     printf("%s byte %s, %d\n", mnemonic, dst, data);
+    // }
+
     return instruction;
 }
 
 Instruction add_sub_cmp_imm_accum(FileContents file, size_t offset, size_t *consumed) {
     Instruction instruction;
 
+    uint8_t b1 = file.bytes[offset++];
+    *consumed += 1;
+
+    uint8_t w = b1 & 0x01;
+
+    size_t consumed_before = *consumed;
+    Operand imm_decoded = decode_immediate(file, offset, consumed, w);
+
+    Operand accum_decoded;
+    accum_decoded.type = OPERAND_TYPE_REGISTER;
+    if (w == 0) {
+        accum_decoded.reg = REGISTER_AX;
+    } else {
+        accum_decoded.reg = REGISTER_AL;
+    }
+
+    instruction.operands[0] = imm_decoded;
+    instruction.operands[1] = accum_decoded;
+
     return instruction;
 }
+
+// TODO handle jump/loop instructions
