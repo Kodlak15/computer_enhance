@@ -86,6 +86,10 @@ const char *operation_as_str(Operation op) {
             return "jno";
         case OPERATION_JNS:
             return "jns";
+        case OPERATION_JLE:
+            return "jle";
+        case OPERATION_JNLE:
+            return "jnle";
         case OPERATION_LOOP:
             return "loop";
         case OPERATION_LOOPZ:
@@ -98,8 +102,6 @@ const char *operation_as_str(Operation op) {
 }
 
 char *operand_as_str(Operand op, char *buf, size_t size) {
-    // static char buf[32];
-
     switch (op.type) {
         case OPERAND_TYPE_REGISTER:
             switch (op.reg) {

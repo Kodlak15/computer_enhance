@@ -17,3 +17,5 @@ Instruction mov_imm_reg(FileContents file, size_t offset, size_t *consumed);
 Instruction add_sub_cmp_rm_reg(FileContents file, size_t offset, size_t *consumed);
 Instruction add_sub_cmp_imm_rm(FileContents file, size_t offset, size_t *consumed);
 Instruction add_sub_cmp_imm_accum(FileContents file, size_t offset, size_t *consumed);
+Instruction cond_jmp(FileContents file, size_t offset, size_t *consumed);
+Instruction loop(FileContents file, size_t offset, size_t *consumed);

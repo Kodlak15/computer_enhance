@@ -56,6 +56,28 @@ OperationHandler handler_table[256] = {
     [0xbd] = mov_imm_reg,
     [0xbe] = mov_imm_reg,
     [0xbf] = mov_imm_reg,
+    // Jump: Unconditional jump
+    [0x70] = cond_jmp,
+    [0x71] = cond_jmp,
+    [0x72] = cond_jmp,
+    [0x73] = cond_jmp,
+    [0x74] = cond_jmp,
+    [0x75] = cond_jmp,
+    [0x76] = cond_jmp,
+    [0x77] = cond_jmp,
+    [0x78] = cond_jmp,
+    [0x79] = cond_jmp,
+    [0x7a] = cond_jmp,
+    [0x7b] = cond_jmp,
+    [0x7c] = cond_jmp,
+    [0x7d] = cond_jmp,
+    [0x7e] = cond_jmp,
+    [0x7f] = cond_jmp,
+    // Loop: Loop instructions
+    [0xe0] = loop,
+    [0xe1] = loop,
+    [0xe2] = loop,
+    [0xe3] = loop,
 };
 
 DecoderResult decode(FileContents file) {
@@ -65,14 +87,19 @@ DecoderResult decode(FileContents file) {
     // multiplied by the size of `Instruction`
     Instruction *instructions = malloc(file.size * sizeof(*instructions));
 
+    printf("Started decoding\n");
+
     size_t offset = 0;
     size_t count = 0;
     while (offset < file.size) {
+        printf("Byte: 0x%x\n", file.bytes[offset]);
         size_t consumed = 0;
         Instruction instruction = handler_table[file.bytes[offset]](file, offset, &consumed);
         instructions[count++] = instruction;
         offset += consumed;
     }
+
+    printf("Finished decoding\n");
 
     result.instructions = instructions;
     result.count = count;
@@ -325,6 +352,7 @@ Instruction add_sub_cmp_imm_rm(FileContents file, size_t offset, size_t *consume
     uint8_t mod = (b2 >> 6) & 0x03;
     uint8_t rm = b2 & 0x07;
 
+    // TODO I think something here is going wrong and causing me to segfault
     size_t consumed_before = *consumed;
     Operand rm_decoded = decode_rm(file, offset, consumed, rm, mod, w);
     offset += *consumed - consumed_before; // update offset to reflect bytes read in decode_rm
@@ -368,4 +396,100 @@ Instruction add_sub_cmp_imm_accum(FileContents file, size_t offset, size_t *cons
     return instruction;
 }
 
-// TODO handle jump/loop instructions
+Instruction cond_jmp(FileContents file, size_t offset, size_t *consumed) {
+    Instruction instruction;
+
+    uint8_t b1 = file.bytes[offset++];
+    *consumed += 1;
+    int8_t b2 = file.bytes[offset++];
+    *consumed += 1;
+
+    switch (b1 & 0x0f) {
+        case 0x00:
+            instruction.operation = OPERATION_JO;
+            break;
+        case 0x01:
+            instruction.operation = OPERATION_JNO;
+            break;
+        case 0x02:
+            instruction.operation = OPERATION_JB;
+            break;
+        case 0x03:
+            instruction.operation = OPERATION_JNB;
+            break;
+        case 0x04:
+            instruction.operation = OPERATION_JE;
+            break;
+        case 0x05:
+            instruction.operation = OPERATION_JNE;
+            break;
+        case 0x06:
+            instruction.operation = OPERATION_JL;
+            break;
+        case 0x07:
+            instruction.operation = OPERATION_JNL;
+            break;
+        case 0x08:
+            instruction.operation = OPERATION_JS;
+            break;
+        case 0x09:
+            instruction.operation = OPERATION_JNS;
+            break;
+        case 0x0a:
+            instruction.operation = OPERATION_JP;
+            break;
+        case 0x0b:
+            instruction.operation = OPERATION_JNP;
+            break;
+        case 0x0c:
+            instruction.operation = OPERATION_JL;
+            break;
+        case 0x0d:
+            instruction.operation = OPERATION_JNL;
+            break;
+        case 0x0e:
+            instruction.operation = OPERATION_JLE;
+            break;
+        case 0x0f:
+            instruction.operation = OPERATION_JNLE;
+            break;
+    }
+
+    Operand inc;
+    inc.type = OPERAND_TYPE_IMMEDIATE;
+    inc.immediate = b2; // should inc have its own operand type?
+    instruction.operands[0] = inc;
+
+    return instruction;
+}
+
+Instruction loop(FileContents file, size_t offset, size_t *consumed) {
+    Instruction instruction;
+
+    uint8_t b1 = file.bytes[offset++];
+    *consumed += 1;
+    int8_t b2 = file.bytes[offset++];
+    *consumed += 1;
+
+    switch (b1 & 0x03) {
+        case 0x00:
+            instruction.operation = OPERATION_LOOPNZ;
+            break;
+        case 0x01:
+            instruction.operation = OPERATION_LOOPZ;
+            break;
+        case 0x02:
+            instruction.operation = OPERATION_LOOP;
+            break;
+        case 0x03:
+            instruction.operation = OPERATION_JCXZ;
+            break;
+    }
+
+    Operand inc;
+    inc.type = OPERAND_TYPE_IMMEDIATE;
+    inc.immediate = b2; // should inc have its own operand type?
+    instruction.operands[0] = inc;
+
+    return instruction;
+}
