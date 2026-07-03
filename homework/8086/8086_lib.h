@@ -82,7 +82,7 @@ typedef struct {
     union {
         Register reg;
         EffectiveAddress effective_address;
-        uint16_t immediate;
+        int16_t immediate;
     };
 } Operand;
 

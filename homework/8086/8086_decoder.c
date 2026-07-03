@@ -111,7 +111,23 @@ EffectiveAddressBase decode_effective_address_base(uint8_t rm) {
     }
 }
 
-uint16_t decode_immediate(FileContents file, size_t offset, size_t *consumed, uint8_t w) {}
+Operand decode_immediate(FileContents file, size_t offset, size_t *consumed, uint8_t w) {
+    Operand result;
+    result.type = OPERAND_TYPE_IMMEDIATE;
+
+    uint8_t data_lo = file.bytes[offset++];
+    *consumed += 1;
+
+    if (w == 1) {
+        uint8_t data_hi = file.bytes[offset++];
+        *consumed += 1;
+        result.immediate = (int16_t)((int16_t)data_lo | ((int16_t)data_hi << 8));
+    } else {
+        result.immediate = (int8_t)data_lo;
+    }
+
+    return result;
+}
 
 Operand decode_rm(FileContents file, size_t offset, size_t *consumed, uint8_t rm, uint8_t mod, uint8_t w) {
     Operand result;
@@ -129,16 +145,21 @@ Operand decode_rm(FileContents file, size_t offset, size_t *consumed, uint8_t rm
                 result.effective_address.base = EA_BASE_DIRECT;
                 result.effective_address.displacement = disp;
             } else {
+                result.type = OPERAND_TYPE_MEMORY;
+                result.effective_address.base = decode_effective_address_base(rm);
+                result.effective_address.displacement = 0;
             }
-        } break;
+            break;
+        }
         case 0x01: {
-            int16_t disp = file.bytes[offset++];
+            int16_t disp = (int8_t)file.bytes[offset++];
             *consumed += 1;
 
             result.type = OPERAND_TYPE_MEMORY;
             result.effective_address.base = decode_effective_address_base(rm);
             result.effective_address.displacement = disp;
-        } break;
+            break;
+        }
         case 0x02: {
             uint8_t disp_lo = file.bytes[offset++];
             *consumed += 1;
@@ -157,38 +178,6 @@ Operand decode_rm(FileContents file, size_t offset, size_t *consumed, uint8_t rm
 
     return result;
 }
-
-// Register decode_reg(uint8_t reg, uint8_t w) {
-//     switch (reg) {
-//         case 0x00: {
-//             return w == 0 ? REGISTER_AL : REGISTER_AX;
-//         };
-//         case 0x01: {
-//             return w == 0 ? REGISTER_CL : REGISTER_CX;
-//         };
-//         case 0x02: {
-//             return w == 0 ? REGISTER_DL : REGISTER_DX;
-//         };
-//         case 0x03: {
-//             return w == 0 ? REGISTER_BL : REGISTER_BX;
-//         };
-//         case 0x04: {
-//             return w == 0 ? REGISTER_AH : REGISTER_SP;
-//         };
-//         case 0x05: {
-//             return w == 0 ? REGISTER_CH : REGISTER_BP;
-//         };
-//         case 0x06: {
-//             return w == 0 ? REGISTER_DH : REGISTER_SI;
-//         };
-//         case 0x07: {
-//             return w == 0 ? REGISTER_BH : REGISTER_DI;
-//         };
-//         default: {
-//             return REGISTER_UNDEFINED;
-//         };
-//     }
-// }
 
 Operand decode_reg(uint8_t reg, uint8_t w) {
     Operand result;
@@ -272,28 +261,13 @@ Instruction mov_imm_reg(FileContents file, size_t offset, size_t *consumed) {
     *consumed += 1;
 
     uint8_t w = (b1 >> 3) & 0x01;
-    uint8_t reg = (b1 >> 3) & 0x07;
+    uint8_t reg = b1 & 0x07;
 
-    uint8_t data_lo = file.bytes[offset++];
-    *consumed += 1;
-
-    int16_t data;
-    if (w == 1) {
-        uint8_t data_hi = file.bytes[offset++];
-        *consumed += 1;
-        data = (int16_t)((int16_t)data_lo | ((int16_t)data_hi << 8));
-    } else {
-        data = (int8_t)data_lo;
-    }
-
+    Operand imm_decoded = decode_immediate(file, offset, consumed, w);
     Operand reg_decoded = decode_reg(reg, w);
 
-    Operand imm_decoded;
-    imm_decoded.type = OPERAND_TYPE_IMMEDIATE;
-    imm_decoded.immediate = data;
-
-    instruction.operands[0] = reg_decoded;
-    instruction.operands[1] = imm_decoded;
+    instruction.operands[0] = imm_decoded;
+    instruction.operands[1] = reg_decoded;
 
     return instruction;
 }
@@ -339,13 +313,13 @@ Instruction add_sub_cmp_rm_reg(FileContents file, size_t offset, size_t *consume
 }
 
 Instruction add_sub_cmp_imm_rm(FileContents file, size_t offset, size_t *consumed) {
-    Instruction result = {};
+    Instruction instruction;
 
-    return result;
+    return instruction;
 }
 
 Instruction add_sub_cmp_imm_accum(FileContents file, size_t offset, size_t *consumed) {
-    Instruction result = {};
+    Instruction instruction;
 
-    return result;
+    return instruction;
 }
