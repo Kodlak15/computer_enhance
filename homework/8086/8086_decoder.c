@@ -1,4 +1,5 @@
 #include "8086_decoder.h"
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -78,38 +79,6 @@ DecoderResult decode(FileContents file) {
     return result;
 }
 
-Register decode_reg(uint8_t reg, uint8_t w) {
-    switch (reg) {
-        case 0x00: {
-            return w == 0 ? REGISTER_AL : REGISTER_AX;
-        };
-        case 0x01: {
-            return w == 0 ? REGISTER_CL : REGISTER_CX;
-        };
-        case 0x02: {
-            return w == 0 ? REGISTER_DL : REGISTER_DX;
-        };
-        case 0x03: {
-            return w == 0 ? REGISTER_BL : REGISTER_BX;
-        };
-        case 0x04: {
-            return w == 0 ? REGISTER_AH : REGISTER_SP;
-        };
-        case 0x05: {
-            return w == 0 ? REGISTER_CH : REGISTER_BP;
-        };
-        case 0x06: {
-            return w == 0 ? REGISTER_DH : REGISTER_SI;
-        };
-        case 0x07: {
-            return w == 0 ? REGISTER_BH : REGISTER_DI;
-        };
-        default: {
-            return REGISTER_UNDEFINED;
-        };
-    }
-}
-
 EffectiveAddressBase decode_effective_address_base(uint8_t rm) {
     switch (rm) {
         case 0x00: {
@@ -142,6 +111,130 @@ EffectiveAddressBase decode_effective_address_base(uint8_t rm) {
     }
 }
 
+uint16_t decode_immediate(FileContents file, size_t offset, size_t *consumed, uint8_t w) {}
+
+Operand decode_rm(FileContents file, size_t offset, size_t *consumed, uint8_t rm, uint8_t mod, uint8_t w) {
+    Operand result;
+
+    switch (mod) {
+        case 0x00: {
+            if (rm == 0x06) {
+                uint8_t disp_lo = file.bytes[offset++];
+                *consumed += 1;
+                uint8_t disp_hi = file.bytes[offset++];
+                *consumed += 1;
+                int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
+
+                result.type = OPERAND_TYPE_MEMORY;
+                result.effective_address.base = EA_BASE_DIRECT;
+                result.effective_address.displacement = disp;
+            } else {
+            }
+        } break;
+        case 0x01: {
+            int16_t disp = file.bytes[offset++];
+            *consumed += 1;
+
+            result.type = OPERAND_TYPE_MEMORY;
+            result.effective_address.base = decode_effective_address_base(rm);
+            result.effective_address.displacement = disp;
+        } break;
+        case 0x02: {
+            uint8_t disp_lo = file.bytes[offset++];
+            *consumed += 1;
+            uint8_t disp_hi = file.bytes[offset++];
+            *consumed += 1;
+            int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
+
+            result.type = OPERAND_TYPE_MEMORY;
+            result.effective_address.base = decode_effective_address_base(rm);
+            result.effective_address.displacement = disp;
+        } break;
+        case 0x03: {
+            result = decode_reg(rm, w);
+        } break;
+    }
+
+    return result;
+}
+
+// Register decode_reg(uint8_t reg, uint8_t w) {
+//     switch (reg) {
+//         case 0x00: {
+//             return w == 0 ? REGISTER_AL : REGISTER_AX;
+//         };
+//         case 0x01: {
+//             return w == 0 ? REGISTER_CL : REGISTER_CX;
+//         };
+//         case 0x02: {
+//             return w == 0 ? REGISTER_DL : REGISTER_DX;
+//         };
+//         case 0x03: {
+//             return w == 0 ? REGISTER_BL : REGISTER_BX;
+//         };
+//         case 0x04: {
+//             return w == 0 ? REGISTER_AH : REGISTER_SP;
+//         };
+//         case 0x05: {
+//             return w == 0 ? REGISTER_CH : REGISTER_BP;
+//         };
+//         case 0x06: {
+//             return w == 0 ? REGISTER_DH : REGISTER_SI;
+//         };
+//         case 0x07: {
+//             return w == 0 ? REGISTER_BH : REGISTER_DI;
+//         };
+//         default: {
+//             return REGISTER_UNDEFINED;
+//         };
+//     }
+// }
+
+Operand decode_reg(uint8_t reg, uint8_t w) {
+    Operand result;
+    result.type = OPERAND_TYPE_REGISTER;
+
+    switch (reg) {
+        case 0x00:
+            result.reg = w == 0 ? REGISTER_AL : REGISTER_AX;
+            break;
+        case 0x01: {
+            result.reg = w == 0 ? REGISTER_CL : REGISTER_CX;
+            break;
+        };
+        case 0x02: {
+            result.reg = w == 0 ? REGISTER_DL : REGISTER_DX;
+            break;
+        };
+        case 0x03: {
+            result.reg = w == 0 ? REGISTER_BL : REGISTER_BX;
+            break;
+        };
+        case 0x04: {
+            result.reg = w == 0 ? REGISTER_AH : REGISTER_SP;
+            break;
+        };
+        case 0x05: {
+            result.reg = w == 0 ? REGISTER_CH : REGISTER_BP;
+            break;
+        };
+        case 0x06: {
+            result.reg = w == 0 ? REGISTER_DH : REGISTER_SI;
+            break;
+        };
+        case 0x07: {
+            result.reg = w == 0 ? REGISTER_BH : REGISTER_DI;
+            break;
+        };
+        default: {
+            result.reg = REGISTER_UNDEFINED;
+            break;
+        };
+    }
+
+    return result;
+}
+
 Instruction mov_rm_reg(FileContents file, size_t offset, size_t *consumed) {
     Instruction instruction;
     instruction.operation = OPERATION_MOV;
@@ -157,50 +250,8 @@ Instruction mov_rm_reg(FileContents file, size_t offset, size_t *consumed) {
     uint8_t reg = (b2 >> 3) & 0x07;
     uint8_t rm = b2 & 0x07;
 
-    Operand rm_decoded;
-    switch (mod) {
-        case 0x00: {
-            if (rm == 0x06) {
-                uint8_t disp_lo = file.bytes[offset++];
-                *consumed += 1;
-                uint8_t disp_hi = file.bytes[offset++];
-                *consumed += 1;
-                int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
-
-                rm_decoded.type = OPERAND_TYPE_MEMORY;
-                rm_decoded.effective_address.base = EA_BASE_DIRECT;
-                rm_decoded.effective_address.displacement = disp;
-            } else {
-            }
-        } break;
-        case 0x01: {
-            int16_t disp = file.bytes[offset++];
-            *consumed += 1;
-
-            rm_decoded.type = OPERAND_TYPE_MEMORY;
-            rm_decoded.effective_address.base = decode_effective_address_base(rm);
-            rm_decoded.effective_address.displacement = disp;
-        } break;
-        case 0x02: {
-            uint8_t disp_lo = file.bytes[offset++];
-            *consumed += 1;
-            uint8_t disp_hi = file.bytes[offset++];
-            *consumed += 1;
-            int16_t disp = (int16_t)((uint16_t)disp_lo | ((uint16_t)disp_hi << 8));
-
-            rm_decoded.type = OPERAND_TYPE_MEMORY;
-            rm_decoded.effective_address.base = decode_effective_address_base(rm);
-            rm_decoded.effective_address.displacement = disp;
-        } break;
-        case 0x03: {
-            rm_decoded.type = OPERAND_TYPE_REGISTER;
-            rm_decoded.reg = decode_reg(rm, w);
-        } break;
-    }
-
-    Operand reg_decoded;
-    reg_decoded.type = OPERAND_TYPE_REGISTER;
-    reg_decoded.reg = decode_reg(reg, w);
+    Operand rm_decoded = decode_rm(file, offset, consumed, rm, mod, w);
+    Operand reg_decoded = decode_reg(reg, w);
 
     if (d == 0) {
         instruction.operands[0] = reg_decoded;
@@ -214,15 +265,77 @@ Instruction mov_rm_reg(FileContents file, size_t offset, size_t *consumed) {
 }
 
 Instruction mov_imm_reg(FileContents file, size_t offset, size_t *consumed) {
-    Instruction result = {};
+    Instruction instruction;
+    instruction.operation = OPERATION_MOV;
 
-    return result;
+    uint8_t b1 = file.bytes[offset++];
+    *consumed += 1;
+
+    uint8_t w = (b1 >> 3) & 0x01;
+    uint8_t reg = (b1 >> 3) & 0x07;
+
+    uint8_t data_lo = file.bytes[offset++];
+    *consumed += 1;
+
+    int16_t data;
+    if (w == 1) {
+        uint8_t data_hi = file.bytes[offset++];
+        *consumed += 1;
+        data = (int16_t)((int16_t)data_lo | ((int16_t)data_hi << 8));
+    } else {
+        data = (int8_t)data_lo;
+    }
+
+    Operand reg_decoded = decode_reg(reg, w);
+
+    Operand imm_decoded;
+    imm_decoded.type = OPERAND_TYPE_IMMEDIATE;
+    imm_decoded.immediate = data;
+
+    instruction.operands[0] = reg_decoded;
+    instruction.operands[1] = imm_decoded;
+
+    return instruction;
 }
 
 Instruction add_sub_cmp_rm_reg(FileContents file, size_t offset, size_t *consumed) {
-    Instruction result = {};
+    Instruction instruction;
 
-    return result;
+    uint8_t b1 = file.bytes[offset++];
+    *consumed += 1;
+    uint8_t b2 = file.bytes[offset++];
+    *consumed += 1;
+
+    switch (b1 & 0x38) {
+        case 0x00:
+            instruction.operation = OPERATION_ADD;
+            break;
+        case 0x28:
+            instruction.operation = OPERATION_SUB;
+            break;
+        case 0x38:
+            instruction.operation = OPERATION_CMP;
+            break;
+    }
+
+    uint8_t d = (b1 >> 1) & 0x01;
+    uint8_t w = b1 & 0x01;
+    uint8_t mod = (b2 >> 6) & 0x03;
+    uint8_t reg = (b2 >> 3) & 0x07;
+    uint8_t rm = b2 & 0x07;
+
+    Operand rm_decoded = decode_rm(file, offset, consumed, rm, mod, w);
+    Operand reg_decoded = decode_reg(reg, w);
+
+    if (d == 0) {
+        instruction.operands[0] = reg_decoded;
+        instruction.operands[1] = rm_decoded;
+    } else {
+        instruction.operands[0] = rm_decoded;
+        instruction.operands[1] = reg_decoded;
+    }
+
+    return instruction;
 }
 
 Instruction add_sub_cmp_imm_rm(FileContents file, size_t offset, size_t *consumed) {
