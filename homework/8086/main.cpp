@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,7 +7,6 @@
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
-typedef uintptr_t uptr;
 
 struct ByteArray {
     u8 *buf;
@@ -17,7 +17,7 @@ ByteArray ByteArrayFromFile(FILE *file, size_t size) {
     ByteArray a;
     a.buf = nullptr;
 
-    u8 *buf = (u8 *)malloc(size + 1);
+    u8 *buf = (u8 *)malloc(size);
     if (!buf) {
         fprintf(stderr, "Error: Failed to allocate memory for file contents.\n");
         fclose(file);
@@ -129,6 +129,18 @@ struct Instruction {
     Operand destination;
 };
 
+Instruction *DecodeInstructions(ByteArray *a) {
+    Instruction *instructions = (Instruction *)malloc(a->size * sizeof(Instruction));
+
+    size_t offset = 0;
+    size_t count = 0;
+    size_t consumed;
+    while (offset < a->size) {
+        consumed = 0;
+        // todo
+    }
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "Missing argument [path]\n");
@@ -149,5 +161,10 @@ int main(int argc, char **argv) {
     }
 
     ByteArray a = ByteArrayFromFile(file, size);
+    if (!a.buf) {
+        return 1;
+    }
     printf("%s\n", a.buf);
+
+    free(a.buf);
 }
