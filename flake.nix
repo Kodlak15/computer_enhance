@@ -19,14 +19,13 @@
       }: {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            gcc
             clang
             nasm
             xxd
           ];
 
           shellHook = ''
-            exec ${pkgs.zsh}/bin/zsh -c ${pkgs.zellij}/bin/zellij
+            exec ${pkgs.tmux}/bin/tmux
           '';
         };
       };
