@@ -1,6 +1,7 @@
 // 8086 Manual (see page 161):
 // https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
 
+#include <cstddef>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,7 +20,7 @@ struct ByteArray {
 
 ByteArray ByteArrayFromFile(FILE *file, size_t size) {
     ByteArray a;
-    a.buf = nullptr;
+    a.buf = NULL;
 
     u8 *buf = (u8 *)malloc(size);
     if (!buf) {
@@ -359,10 +360,20 @@ Operand DecodeRegMem(u8 **p, u8 rm, u8 mod, u8 w) {
     return o;
 }
 
-Operand DecodeImmediate() {
+Operand DecodeImmediate(u8 **p, u8 w) {
     Operand o;
+    o.type = OPERAND_TYPE_IMMEDIATE;
 
-    // todo
+    u8 dataLo;
+    u8 dataHi;
+    if (w == 1) {
+        dataLo = ReadByte(p);
+        dataHi = ReadByte(p);
+        o.imm = (i16)((i16)dataLo | ((i16)dataHi << 8));
+    } else {
+        dataLo = ReadByte(p);
+        o.imm = (i16)dataLo;
+    }
 
     return o;
 }
@@ -376,8 +387,8 @@ struct Instruction {
 typedef Instruction (*InstructionHandler)(u8 **p);
 
 Instruction MovRmReg(u8 **p) {
-    Instruction in;
-    in.mnemonic = MNEMONIC_MOV;
+    Instruction instruction;
+    instruction.mnemonic = MNEMONIC_MOV;
 
     u8 b1 = ReadByte(p);
     u8 b2 = ReadByte(p);
@@ -392,114 +403,263 @@ Instruction MovRmReg(u8 **p) {
     Operand regDecoded = DecodeReg(reg, w);
 
     if (d == 0) {
-        in.src = regDecoded;
-        in.dst = rmDecoded;
+        instruction.src = regDecoded;
+        instruction.dst = rmDecoded;
     } else {
-        in.src = rmDecoded;
-        in.dst = regDecoded;
+        instruction.src = rmDecoded;
+        instruction.dst = regDecoded;
     }
 
-    return in;
+    return instruction;
 }
 
-InstructionHandler handlerTable[] = {
-    //     // Add: Reg/memory with register to either
-    //     [0x00] = add_sub_cmp_rm_reg,
-    //     [0x01] = add_sub_cmp_rm_reg,
-    //     [0x02] = add_sub_cmp_rm_reg,
-    //     [0x03] = add_sub_cmp_rm_reg,
-    //     // Add: Immediate to accumulator
-    //     [0x04] = add_sub_cmp_imm_accum,
-    //     [0x05] = add_sub_cmp_imm_accum,
-    //     // Sub: Reg/memory and register to either
-    //     [0x28] = add_sub_cmp_rm_reg,
-    //     [0x29] = add_sub_cmp_rm_reg,
-    //     [0x2a] = add_sub_cmp_rm_reg,
-    //     [0x2b] = add_sub_cmp_rm_reg,
-    //     // Sub: Immediate to accumulator
-    //     [0x2c] = add_sub_cmp_imm_accum,
-    //     [0x2d] = add_sub_cmp_imm_accum,
-    //     // Cmp: Register/memory and register
-    //     [0x38] = add_sub_cmp_rm_reg,
-    //     [0x39] = add_sub_cmp_rm_reg,
-    //     [0x3a] = add_sub_cmp_rm_reg,
-    //     [0x3b] = add_sub_cmp_rm_reg,
-    //     // Cmp: Immediate with accumulator
-    //     [0x3c] = add_sub_cmp_imm_accum,
-    //     [0x3d] = add_sub_cmp_imm_accum,
-    //     // Add/Sub/Cmp: Immediate to/from/with register/memory (all have same first byte)
-    //     [0x80] = add_sub_cmp_imm_rm,
-    //     [0x81] = add_sub_cmp_imm_rm,
-    //     [0x82] = add_sub_cmp_imm_rm,
-    //     [0x83] = add_sub_cmp_imm_rm,
+Instruction MovImmReg(u8 **p) {
+    Instruction instruction;
+    instruction.mnemonic = MNEMONIC_MOV;
+
+    u8 b1 = ReadByte(p);
+
+    u8 w = (b1 >> 3) & 0x01;
+    u8 reg = b1 & 0x07;
+
+    Operand immDecoded = DecodeImmediate(p, w);
+    Operand regDecoded = DecodeReg(reg, w);
+
+    instruction.src = immDecoded;
+    instruction.dst = regDecoded;
+
+    return instruction;
+}
+
+Instruction AddSubCmpRmReg(u8 **p) {
+    Instruction instruction;
+
+    u8 b1 = ReadByte(p);
+    u8 b2 = ReadByte(p);
+
+    switch (b1 & 0x38) {
+        case 0x00:
+            instruction.mnemonic = MNEMONIC_ADD;
+            break;
+        case 0x28:
+            instruction.mnemonic = MNEMONIC_SUB;
+            break;
+        case 0x38:
+            instruction.mnemonic = MNEMONIC_CMP;
+            break;
+    }
+
+    u8 d = (b1 >> 1) & 0x01;
+    u8 w = b1 & 0x01;
+    u8 mod = (b2 >> 6) & 0x03;
+    u8 reg = (b2 >> 3) & 0x07;
+    u8 rm = b2 & 0x07;
+
+    Operand rmDecoded = DecodeRegMem(p, rm, mod, w);
+    Operand regDecoded = DecodeReg(reg, w);
+
+    if (d == 0) {
+        instruction.src = regDecoded;
+        instruction.dst = rmDecoded;
+    } else {
+        instruction.src = rmDecoded;
+        instruction.dst = regDecoded;
+    }
+
+    return instruction;
+}
+
+// todo
+Instruction AddSubCmpImmRm(u8 **p) {
+    Instruction instruction;
+
+    u8 b1 = ReadByte(p);
+    u8 b2 = ReadByte(p);
+
+    // ??? not positive this is right
+    switch (b1 & 0x38) {
+        case 0x00:
+            instruction.mnemonic = MNEMONIC_ADD;
+            break;
+        case 0x28:
+            instruction.mnemonic = MNEMONIC_SUB;
+            break;
+        case 0x38:
+            instruction.mnemonic = MNEMONIC_CMP;
+            break;
+    }
+
+    u8 s = (b1 >> 1) & 0x01;
+    u8 w = b1 & 0x01;
+    u8 mod = (b2 >> 6) & 0x03;
+    u8 rm = b2 & 0x07;
+
+    // NOTE todo messages from below were from my last attempt at making this decoder
+
+    // TODO I think something here is going wrong and causing me to segfault
+    // size_t consumed_before = *consumed;
+    // Operand rm_decoded = decode_rm(file, offset, consumed, rm, mod, w);
+    // offset += *consumed - consumed_before; // update offset to reflect bytes read in decode_rm
+    // Operand imm_decoded = decode_immediate(file, offset, consumed, w);
+
+    // TODO handle converting this part
+    // const char *dst = rm_buf;
+    // if (mod == 0b11) {
+    //     printf("%s %s, %d\n", mnemonic, dst, data);
+    // } else if (w == 1) {
+    //     printf("%s word %s, %d\n", mnemonic, dst, data);
+    // } else {
+    //     printf("%s byte %s, %d\n", mnemonic, dst, data);
+    // }
+
+    return instruction;
+}
+
+Instruction AddSubCmpImmAccum(u8 **p) {
+    Instruction instruction;
+
+    u8 b1 = ReadByte(p);
+
+    switch (b1 & 0x38) {
+        case 0x00:
+            instruction.mnemonic = MNEMONIC_ADD;
+            break;
+        case 0x28:
+            instruction.mnemonic = MNEMONIC_SUB;
+            break;
+        case 0x38:
+            instruction.mnemonic = MNEMONIC_CMP;
+            break;
+    }
+
+    u8 w = b1 & 0x01;
+
+    Operand immDecoded = DecodeImmediate(p, w);
+    Operand accumDecoded = DecodeReg(0x00, w);
+
+    instruction.src = immDecoded;
+    instruction.dst = accumDecoded;
+
+    return instruction;
+}
+
+Instruction UnhandledInstruction(u8 **p) {
+    fprintf(stderr, "Error: Attempted to handle an instruction with no assigned handler.\n");
+    exit(1);
+}
+
+void BuildLookupTable(InstructionHandler *table) {
+    for (size_t i = 0; i < 255; i++) {
+        table[i] = UnhandledInstruction;
+    }
+
+    // Add: Reg/memory with register to either
+    table[0x00] = AddSubCmpRmReg;
+    table[0x01] = AddSubCmpRmReg;
+    table[0x02] = AddSubCmpRmReg;
+    table[0x03] = AddSubCmpRmReg;
+    // Add: Immediate to accumulator
+    table[0x04] = AddSubCmpImmAccum;
+    table[0x05] = AddSubCmpImmAccum;
+    // Sub: Reg/memory and register to either
+    table[0x28] = AddSubCmpRmReg;
+    table[0x29] = AddSubCmpRmReg;
+    table[0x2a] = AddSubCmpRmReg;
+    table[0x2b] = AddSubCmpRmReg;
+    // Sub: Immediate to accumulator
+    table[0x2c] = AddSubCmpImmAccum;
+    table[0x2d] = AddSubCmpImmAccum;
+    // Cmp: Register/memory and register
+    table[0x38] = AddSubCmpRmReg;
+    table[0x39] = AddSubCmpRmReg;
+    table[0x3a] = AddSubCmpRmReg;
+    table[0x3b] = AddSubCmpRmReg;
+    // Cmp: Immediate with accumulator
+    table[0x3c] = AddSubCmpImmAccum;
+    table[0x3d] = AddSubCmpImmAccum;
+    // Add/Sub/Cmp: Immediate to/from/with register/memory (all have same first byte)
+    table[0x80] = AddSubCmpImmRm;
+    table[0x81] = AddSubCmpImmRm;
+    table[0x82] = AddSubCmpImmRm;
+    table[0x83] = AddSubCmpImmRm;
     // Move: Register/memory to/from register
-    [0x88] = MovRmReg,
-    [0x89] = MovRmReg,
-    [0x8a] = MovRmReg,
-    [0x8b] = MovRmReg,
-    //     // Move: Immediate to register
-    //     [0xb0] = mov_imm_reg,
-    //     [0xb1] = mov_imm_reg,
-    //     [0xb2] = mov_imm_reg,
-    //     [0xb3] = mov_imm_reg,
-    //     [0xb4] = mov_imm_reg,
-    //     [0xb5] = mov_imm_reg,
-    //     [0xb6] = mov_imm_reg,
-    //     [0xb7] = mov_imm_reg,
-    //     [0xb8] = mov_imm_reg,
-    //     [0xb9] = mov_imm_reg,
-    //     [0xba] = mov_imm_reg,
-    //     [0xbb] = mov_imm_reg,
-    //     [0xbc] = mov_imm_reg,
-    //     [0xbd] = mov_imm_reg,
-    //     [0xbe] = mov_imm_reg,
-    //     [0xbf] = mov_imm_reg,
+    table[0x88] = MovRmReg;
+    table[0x89] = MovRmReg;
+    table[0x8a] = MovRmReg;
+    table[0x8b] = MovRmReg;
+    // Move: Immediate to register
+    table[0xb0] = MovImmReg;
+    table[0xb1] = MovImmReg;
+    table[0xb2] = MovImmReg;
+    table[0xb3] = MovImmReg;
+    table[0xb4] = MovImmReg;
+    table[0xb5] = MovImmReg;
+    table[0xb6] = MovImmReg;
+    table[0xb7] = MovImmReg;
+    table[0xb8] = MovImmReg;
+    table[0xb9] = MovImmReg;
+    table[0xba] = MovImmReg;
+    table[0xbb] = MovImmReg;
+    table[0xbc] = MovImmReg;
+    table[0xbd] = MovImmReg;
+    table[0xbe] = MovImmReg;
+    table[0xbf] = MovImmReg;
     //     // Jump: Unconditional jump
-    //     [0x70] = cond_jmp,
-    //     [0x71] = cond_jmp,
-    //     [0x72] = cond_jmp,
-    //     [0x73] = cond_jmp,
-    //     [0x74] = cond_jmp,
-    //     [0x75] = cond_jmp,
-    //     [0x76] = cond_jmp,
-    //     [0x77] = cond_jmp,
-    //     [0x78] = cond_jmp,
-    //     [0x79] = cond_jmp,
-    //     [0x7a] = cond_jmp,
-    //     [0x7b] = cond_jmp,
-    //     [0x7c] = cond_jmp,
-    //     [0x7d] = cond_jmp,
-    //     [0x7e] = cond_jmp,
-    //     [0x7f] = cond_jmp,
+    //     table[0x70] = cond_jmp;
+    //     table[0x71] = cond_jmp;
+    //     table[0x72] = cond_jmp;
+    //     table[0x73] = cond_jmp;
+    //     table[0x74] = cond_jmp;
+    //     table[0x75] = cond_jmp;
+    //     table[0x76] = cond_jmp;
+    //     table[0x77] = cond_jmp;
+    //     table[0x78] = cond_jmp;
+    //     table[0x79] = cond_jmp;
+    //     table[0x7a] = cond_jmp;
+    //     table[0x7b] = cond_jmp;
+    //     table[0x7c] = cond_jmp;
+    //     table[0x7d] = cond_jmp;
+    //     table[0x7e] = cond_jmp;
+    //     table[0x7f] = cond_jmp;
     //     // Loop: Loop instructions
-    //     [0xe0] = loop,
-    //     [0xe1] = loop,
-    //     [0xe2] = loop,
-    //     [0xe3] = loop,
-};
+    //     table[0xe0] = loop;
+    //     table[0xe1] = loop;
+    //     table[0xe2] = loop;
+    //     table[0xe3] = loop;
+}
 
-Instruction *DecodeInstructions(ByteArray *a) {
-    Instruction *ins = (Instruction *)malloc(a->size * sizeof(Instruction));
-
+// Read the decoded instructions into `instructions` and return the number of instructions that were decoded.
+size_t DecodeInstructions(Instruction *instructions, ByteArray *a, InstructionHandler *table) {
     u8 *p = a->buf;
     u8 *q = a->buf;
     size_t count = 0;
     while (p - q < a->size) {
-        ins[count++] = handlerTable[*q + (p - q)](&p);
+        u8 idx = *p;
+        // printf("Index: %x\n", idx);
+        printf("byte: %x\n", *p);
+        instructions[count++] = table[*p](&p);
     }
 
-    return ins;
+    return count;
 }
 
-void PrintInstructions(Instruction *ins) {
+void PrintInstructions(Instruction *instructions, size_t count) {
     char srcBuf[16];
     char dstBuf[16];
 
     printf("bits 16\n\n");
-    for (size_t i = 0; i < sizeof(*ins); i++) {
-        const char *mnemonic = MnemonicAsString(ins->mnemonic);
-        OperandAsString(srcBuf, ins->src);
-        OperandAsString(dstBuf, ins->dst);
+
+    // for (size_t i = 0; i < count; i++) {
+    //     Instruction instruction = instructions[i];
+    //     const char *mnemonic = MnemonicAsString(instruction.mnemonic);
+    //     OperandAsString(srcBuf, instruction.src);
+    //     OperandAsString(dstBuf, instruction.dst);
+    //     printf("%s %s, %s\n", mnemonic, dstBuf, srcBuf);
+    // }
+    for (Instruction *p = instructions; (p - instructions) < count; p++) {
+        const char *mnemonic = MnemonicAsString(p->mnemonic);
+        OperandAsString(srcBuf, p->src);
+        OperandAsString(dstBuf, p->dst);
         printf("%s %s, %s\n", mnemonic, dstBuf, srcBuf);
     }
 }
@@ -527,20 +687,15 @@ int main(int argc, char **argv) {
     if (!a.buf) {
         return 1;
     }
-    // printf("%s\n", a.buf);
 
-    // todo: should be option to simulate
-    Instruction *ins = DecodeInstructions(&a);
-    PrintInstructions(ins);
+    InstructionHandler table[255];
+    BuildLookupTable(table);
 
-    // // note: just an example, this only captures one simple path
-    // Instruction in = ins[0];
-    // const char *mnemonicStr = MnemonicAsString(in.mnemonic);
-    // // todo: dst and src should not be the same thing
-    // const char *srcStr = RegisterAsString(in.src.reg);
-    // const char *dstStr = RegisterAsString(in.dst.reg);
-    // printf("%s, %s, %s\n", mnemonicStr, dstStr, srcStr);
+    Instruction *instructions = (Instruction *)malloc(a.size * sizeof(Instruction));
+    size_t count = DecodeInstructions(instructions, &a, table);
 
-    free(ins);
+    PrintInstructions(instructions, count);
+
+    free(instructions);
     free(a.buf);
 }
