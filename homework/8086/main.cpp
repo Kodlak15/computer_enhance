@@ -262,12 +262,12 @@ Operand DecodeReg(u8 reg, u8 w) {
     return o;
 }
 
-Operand DecodeRegMem(ByteArray *a, u8 rm, u8 mod, u8 w) {
+Operand DecodeRegMem(u8 **p, u8 rm, u8 mod, u8 w) {
     Operand o;
 
     if (rm == 0x06 && mod == 0x00) {
-        u8 dispLo = *a->buf++;
-        u8 dispHi = *a->buf++;
+        u8 dispLo = *(*p)++;
+        u8 dispHi = *(*p)++;
 
         o.type = OPERAND_TYPE_MEMORY;
         o.eAddr.reg1 = REGISTER_NULL;
@@ -320,14 +320,14 @@ Operand DecodeRegMem(ByteArray *a, u8 rm, u8 mod, u8 w) {
             break;
         case 0x01:
             o.type = OPERAND_TYPE_MEMORY;
-            o.eAddr.disp = *a->buf++;
+            o.eAddr.disp = *(*p)++;
             break;
-        case 0x10:
-            dispLo = *a->buf++;
-            dispHi = *a->buf++;
+        case 0x02:
+            dispLo = *(*p)++;
+            dispHi = *(*p)++;
             o.eAddr.disp = (i16)((i16)dispLo | ((i16)dispHi << 8));
             break;
-        case 0x11:
+        case 0x03:
             o = DecodeReg(rm, w);
             break;
     }
@@ -338,6 +338,8 @@ Operand DecodeRegMem(ByteArray *a, u8 rm, u8 mod, u8 w) {
 Operand DecodeImmediate() {
     Operand o;
 
+    // todo
+
     return o;
 }
 
@@ -347,14 +349,14 @@ struct Instruction {
     Operand dst;
 };
 
-typedef Instruction (*InstructionHandler)(ByteArray *a);
+typedef Instruction (*InstructionHandler)(u8 **p);
 
-Instruction MovRmReg(ByteArray *a) {
+Instruction MovRmReg(u8 **p) {
     Instruction in;
     in.mnemonic = MNEMONIC_MOV;
 
-    u8 b1 = *a->buf++;
-    u8 b2 = *a->buf++;
+    u8 b1 = *(*p)++;
+    u8 b2 = *(*p)++;
 
     u8 d = (b1 >> 1) & 0x01;
     u8 w = b1 & 0x01;
@@ -362,15 +364,15 @@ Instruction MovRmReg(ByteArray *a) {
     u8 reg = (b2 >> 3) & 0x07;
     u8 rm = b2 & 0x07;
 
-    Operand rm_decoded = DecodeRegMem(a, rm, mod, w);
-    Operand reg_decoded = DecodeReg(reg, w);
+    Operand rmDecoded = DecodeRegMem(p, rm, mod, w);
+    Operand regDecoded = DecodeReg(reg, w);
 
     if (d == 0) {
-        in.src = reg_decoded;
-        in.dst = rm_decoded;
+        in.src = regDecoded;
+        in.dst = rmDecoded;
     } else {
-        in.src = rm_decoded;
-        in.dst = reg_decoded;
+        in.src = rmDecoded;
+        in.dst = regDecoded;
     }
 
     return in;
@@ -455,10 +457,11 @@ InstructionHandler handlerTable[] = {
 Instruction *DecodeInstructions(ByteArray *a) {
     Instruction *ins = (Instruction *)malloc(a->size * sizeof(Instruction));
 
-    ByteArray *p = a;
+    u8 *p = a->buf;
+    u8 *q = a->buf;
     size_t count = 0;
-    while (p - a < a->size) {
-        ins[count++] = handlerTable[p - a](p);
+    while (p - q < a->size) {
+        ins[count++] = handlerTable[*q + (p - q)](&p);
     }
 
     return ins;
@@ -487,10 +490,18 @@ int main(int argc, char **argv) {
     if (!a.buf) {
         return 1;
     }
-    printf("%s\n", a.buf);
+    // printf("%s\n", a.buf);
 
     // todo: should be option to simulate
     Instruction *ins = DecodeInstructions(&a);
+
+    // note: just an example, this only captures one simple path
+    Instruction in = ins[0];
+    const char *mnemonicStr = MnemonicAsString(in.mnemonic);
+    // todo: dst and src should not be the same thing
+    const char *srcStr = RegisterAsString(in.src.reg);
+    const char *dstStr = RegisterAsString(in.dst.reg);
+    printf("%s, %s, %s\n", mnemonicStr, dstStr, srcStr);
 
     free(ins);
     free(a.buf);
