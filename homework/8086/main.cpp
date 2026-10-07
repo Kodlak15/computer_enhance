@@ -1,7 +1,6 @@
 // 8086 Manual (see page 161):
 // https://edge.edx.org/c4x/BITSPilani/EEE231/asset/8086_family_Users_Manual_1_.pdf
 
-#include <cstddef>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -218,7 +217,6 @@ struct Operand {
     };
 };
 
-// Decode a register operand using the reg and w fields.
 Operand DecodeReg(u8 reg, u8 w) {
     Operand o;
     o.type = OPERAND_TYPE_REGISTER;
@@ -264,9 +262,84 @@ Operand DecodeReg(u8 reg, u8 w) {
     return o;
 }
 
-Operand DecodeRegMem(ByteArray *a, u8 rm, u8 mod, u8 w) {}
+Operand DecodeRegMem(ByteArray *a, u8 rm, u8 mod, u8 w) {
+    Operand o;
 
-Operand DecodeImmediate() {}
+    if (rm == 0x06 && mod == 0x00) {
+        u8 dispLo = *a->buf++;
+        u8 dispHi = *a->buf++;
+
+        o.type = OPERAND_TYPE_MEMORY;
+        o.eAddr.reg1 = REGISTER_NULL;
+        o.eAddr.reg2 = REGISTER_NULL;
+        o.eAddr.disp = (i16)((i16)dispLo | ((i16)dispHi << 8));
+        return o;
+    }
+
+    switch (rm) {
+        case 0x00:
+            o.eAddr.reg1 = REGISTER_BX;
+            o.eAddr.reg2 = REGISTER_SI;
+            break;
+        case 0x01:
+            o.eAddr.reg1 = REGISTER_BX;
+            o.eAddr.reg2 = REGISTER_DI;
+            break;
+        case 0x02:
+            o.eAddr.reg1 = REGISTER_BP;
+            o.eAddr.reg2 = REGISTER_SI;
+            break;
+        case 0x03:
+            o.eAddr.reg1 = REGISTER_BP;
+            o.eAddr.reg2 = REGISTER_DI;
+            break;
+        case 0x04:
+            o.eAddr.reg1 = REGISTER_SI;
+            o.eAddr.reg2 = REGISTER_NULL;
+            break;
+        case 0x05:
+            o.eAddr.reg1 = REGISTER_DI;
+            o.eAddr.reg2 = REGISTER_NULL;
+            break;
+        case 0x06:
+            o.eAddr.reg1 = REGISTER_BP;
+            o.eAddr.reg2 = REGISTER_NULL;
+            break;
+        case 0x07:
+            o.eAddr.reg1 = REGISTER_BX;
+            o.eAddr.reg2 = REGISTER_NULL;
+            break;
+    }
+
+    u8 dispLo = 0;
+    u8 dispHi = 0;
+    switch (mod) {
+        case 0x00:
+            o.type = OPERAND_TYPE_MEMORY;
+            o.eAddr.disp = 0;
+            break;
+        case 0x01:
+            o.type = OPERAND_TYPE_MEMORY;
+            o.eAddr.disp = *a->buf++;
+            break;
+        case 0x10:
+            dispLo = *a->buf++;
+            dispHi = *a->buf++;
+            o.eAddr.disp = (i16)((i16)dispLo | ((i16)dispHi << 8));
+            break;
+        case 0x11:
+            o = DecodeReg(rm, w);
+            break;
+    }
+
+    return o;
+}
+
+Operand DecodeImmediate() {
+    Operand o;
+
+    return o;
+}
 
 struct Instruction {
     Mnemonic mnemonic;
@@ -274,16 +347,14 @@ struct Instruction {
     Operand dst;
 };
 
-typedef Instruction (*InstructionHandler)(ByteArray *a, size_t offset, size_t *consumed);
+typedef Instruction (*InstructionHandler)(ByteArray *a);
 
-Instruction MovRmReg(ByteArray *a, size_t offset, size_t *consumed) {
-    Instruction instruction;
-    instruction.mnemonic = MNEMONIC_MOV;
+Instruction MovRmReg(ByteArray *a) {
+    Instruction in;
+    in.mnemonic = MNEMONIC_MOV;
 
-    u8 b1 = a->buf[offset++];
-    *consumed += 1;
-    u8 b2 = a->buf[offset++];
-    *consumed += 1;
+    u8 b1 = *a->buf++;
+    u8 b2 = *a->buf++;
 
     u8 d = (b1 >> 1) & 0x01;
     u8 w = b1 & 0x01;
@@ -295,14 +366,14 @@ Instruction MovRmReg(ByteArray *a, size_t offset, size_t *consumed) {
     Operand reg_decoded = DecodeReg(reg, w);
 
     if (d == 0) {
-        instruction.operands[0] = reg_decoded;
-        instruction.operands[1] = rm_decoded;
+        in.src = reg_decoded;
+        in.dst = rm_decoded;
     } else {
-        instruction.operands[0] = rm_decoded;
-        instruction.operands[1] = reg_decoded;
+        in.src = rm_decoded;
+        in.dst = reg_decoded;
     }
 
-    return instruction;
+    return in;
 }
 
 InstructionHandler handlerTable[] = {
@@ -336,10 +407,10 @@ InstructionHandler handlerTable[] = {
     //     [0x82] = add_sub_cmp_imm_rm,
     //     [0x83] = add_sub_cmp_imm_rm,
     // Move: Register/memory to/from register
-    [0x88] = mov_rm_reg,
-    [0x89] = mov_rm_reg,
-    [0x8a] = mov_rm_reg,
-    [0x8b] = mov_rm_reg,
+    [0x88] = MovRmReg,
+    [0x89] = MovRmReg,
+    [0x8a] = MovRmReg,
+    [0x8b] = MovRmReg,
     //     // Move: Immediate to register
     //     [0xb0] = mov_imm_reg,
     //     [0xb1] = mov_imm_reg,
@@ -382,18 +453,15 @@ InstructionHandler handlerTable[] = {
 };
 
 Instruction *DecodeInstructions(ByteArray *a) {
-    Instruction *instructions = (Instruction *)malloc(a->size * sizeof(Instruction));
+    Instruction *ins = (Instruction *)malloc(a->size * sizeof(Instruction));
 
-    size_t offset = 0;
+    ByteArray *p = a;
     size_t count = 0;
-    size_t consumed;
-    while (offset < a->size) {
-        consumed = 0;
-        instructions[count++] = handlerTable[a->buf[offset]](a, offset, &consumed);
-        offset += consumed;
+    while (p - a < a->size) {
+        ins[count++] = handlerTable[p - a](p);
     }
 
-    return instructions;
+    return ins;
 }
 
 int main(int argc, char **argv) {
@@ -422,9 +490,8 @@ int main(int argc, char **argv) {
     printf("%s\n", a.buf);
 
     // todo: should be option to simulate
-    DecodeInstructions(&a);
+    Instruction *ins = DecodeInstructions(&a);
 
-    // Release the byte array buffer (technically not necessary as the OS will clean it up, but for the sake of
-    // completeness we do it anyways).
+    free(ins);
     free(a.buf);
 }
