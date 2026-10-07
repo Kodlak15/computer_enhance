@@ -42,6 +42,11 @@ ByteArray ByteArrayFromFile(FILE *file, size_t size) {
     return a;
 }
 
+// Read the next byte from a buffer and increment the pointer.
+u8 ReadByte(u8 **p) {
+    return *(*p)++;
+}
+
 enum Mnemonic : u8 {
     MNEMONIC_MOV,
     MNEMONIC_ADD,
@@ -190,7 +195,8 @@ struct EffectiveAddress {
     i16 disp;
 };
 
-const char *EffectiveAddressAsString(char buf[], EffectiveAddress ea) {
+// Read the string representation of the effective address calculation into buf.
+void EffectiveAddressAsString(char buf[], EffectiveAddress ea) {
     if (ea.reg1 == REGISTER_NULL) {
         sprintf(buf, "[%d]", ea.disp);
     } else if (ea.reg2 == REGISTER_NULL) {
@@ -198,14 +204,12 @@ const char *EffectiveAddressAsString(char buf[], EffectiveAddress ea) {
     } else {
         sprintf(buf, "[%s + %s + %d]", RegisterAsString(ea.reg1), RegisterAsString(ea.reg2), ea.disp);
     }
-
-    return buf;
 }
 
 enum OperandType {
     OPERAND_TYPE_REGISTER,
+    OPERAND_TYPE_EFFECTIVE_ADDRESS,
     OPERAND_TYPE_IMMEDIATE,
-    OPERAND_TYPE_MEMORY,
 };
 
 struct Operand {
@@ -216,6 +220,25 @@ struct Operand {
         i16 imm;
     };
 };
+
+// Read the string representation of the operand into buf.
+void OperandAsString(char *buf, Operand o) {
+    switch (o.type) {
+        case OPERAND_TYPE_REGISTER: {
+            const char *s = RegisterAsString(o.reg);
+            sprintf(buf, "%s", s);
+            break;
+        }
+        case OPERAND_TYPE_EFFECTIVE_ADDRESS: {
+            EffectiveAddressAsString(buf, o.eAddr);
+            break;
+        }
+        case OPERAND_TYPE_IMMEDIATE: {
+            sprintf(buf, "%d", o.imm);
+            break;
+        }
+    }
+}
 
 Operand DecodeReg(u8 reg, u8 w) {
     Operand o;
@@ -266,10 +289,10 @@ Operand DecodeRegMem(u8 **p, u8 rm, u8 mod, u8 w) {
     Operand o;
 
     if (rm == 0x06 && mod == 0x00) {
-        u8 dispLo = *(*p)++;
-        u8 dispHi = *(*p)++;
+        u8 dispLo = ReadByte(p);
+        u8 dispHi = ReadByte(p);
 
-        o.type = OPERAND_TYPE_MEMORY;
+        o.type = OPERAND_TYPE_EFFECTIVE_ADDRESS;
         o.eAddr.reg1 = REGISTER_NULL;
         o.eAddr.reg2 = REGISTER_NULL;
         o.eAddr.disp = (i16)((i16)dispLo | ((i16)dispHi << 8));
@@ -315,14 +338,15 @@ Operand DecodeRegMem(u8 **p, u8 rm, u8 mod, u8 w) {
     u8 dispHi = 0;
     switch (mod) {
         case 0x00:
-            o.type = OPERAND_TYPE_MEMORY;
+            o.type = OPERAND_TYPE_EFFECTIVE_ADDRESS;
             o.eAddr.disp = 0;
             break;
         case 0x01:
-            o.type = OPERAND_TYPE_MEMORY;
-            o.eAddr.disp = *(*p)++;
+            o.type = OPERAND_TYPE_EFFECTIVE_ADDRESS;
+            o.eAddr.disp = ReadByte(p);
             break;
         case 0x02:
+            o.type = OPERAND_TYPE_EFFECTIVE_ADDRESS;
             dispLo = *(*p)++;
             dispHi = *(*p)++;
             o.eAddr.disp = (i16)((i16)dispLo | ((i16)dispHi << 8));
@@ -355,8 +379,8 @@ Instruction MovRmReg(u8 **p) {
     Instruction in;
     in.mnemonic = MNEMONIC_MOV;
 
-    u8 b1 = *(*p)++;
-    u8 b2 = *(*p)++;
+    u8 b1 = ReadByte(p);
+    u8 b2 = ReadByte(p);
 
     u8 d = (b1 >> 1) & 0x01;
     u8 w = b1 & 0x01;
@@ -467,6 +491,19 @@ Instruction *DecodeInstructions(ByteArray *a) {
     return ins;
 }
 
+void PrintInstructions(Instruction *ins) {
+    char srcBuf[16];
+    char dstBuf[16];
+
+    printf("bits 16\n\n");
+    for (size_t i = 0; i < sizeof(*ins); i++) {
+        const char *mnemonic = MnemonicAsString(ins->mnemonic);
+        OperandAsString(srcBuf, ins->src);
+        OperandAsString(dstBuf, ins->dst);
+        printf("%s %s, %s\n", mnemonic, dstBuf, srcBuf);
+    }
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "Missing argument [path]\n");
@@ -494,14 +531,15 @@ int main(int argc, char **argv) {
 
     // todo: should be option to simulate
     Instruction *ins = DecodeInstructions(&a);
+    PrintInstructions(ins);
 
-    // note: just an example, this only captures one simple path
-    Instruction in = ins[0];
-    const char *mnemonicStr = MnemonicAsString(in.mnemonic);
-    // todo: dst and src should not be the same thing
-    const char *srcStr = RegisterAsString(in.src.reg);
-    const char *dstStr = RegisterAsString(in.dst.reg);
-    printf("%s, %s, %s\n", mnemonicStr, dstStr, srcStr);
+    // // note: just an example, this only captures one simple path
+    // Instruction in = ins[0];
+    // const char *mnemonicStr = MnemonicAsString(in.mnemonic);
+    // // todo: dst and src should not be the same thing
+    // const char *srcStr = RegisterAsString(in.src.reg);
+    // const char *dstStr = RegisterAsString(in.dst.reg);
+    // printf("%s, %s, %s\n", mnemonicStr, dstStr, srcStr);
 
     free(ins);
     free(a.buf);
