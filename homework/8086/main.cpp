@@ -211,6 +211,7 @@ enum OperandType {
     OPERAND_TYPE_REGISTER,
     OPERAND_TYPE_EFFECTIVE_ADDRESS,
     OPERAND_TYPE_IMMEDIATE,
+    OPERAND_TYPE_NULL,
 };
 
 struct Operand {
@@ -236,6 +237,9 @@ void OperandAsString(char *buf, Operand o) {
         }
         case OPERAND_TYPE_IMMEDIATE: {
             sprintf(buf, "%d", o.imm);
+            break;
+        }
+        case OPERAND_TYPE_NULL: {
             break;
         }
     }
@@ -348,8 +352,8 @@ Operand DecodeRegMem(u8 **p, u8 rm, u8 mod, u8 w) {
             break;
         case 0x02:
             o.type = OPERAND_TYPE_EFFECTIVE_ADDRESS;
-            dispLo = *(*p)++;
-            dispHi = *(*p)++;
+            dispLo = ReadByte(p);
+            dispHi = ReadByte(p);
             o.eAddr.disp = (i16)((i16)dispLo | ((i16)dispHi << 8));
             break;
         case 0x03:
@@ -469,14 +473,12 @@ Instruction AddSubCmpRmReg(u8 **p) {
     return instruction;
 }
 
-// todo
 Instruction AddSubCmpImmRm(u8 **p) {
     Instruction instruction;
 
     u8 b1 = ReadByte(p);
     u8 b2 = ReadByte(p);
 
-    // ??? not positive this is right
     switch (b1 & 0x38) {
         case 0x00:
             instruction.mnemonic = MNEMONIC_ADD;
@@ -494,23 +496,11 @@ Instruction AddSubCmpImmRm(u8 **p) {
     u8 mod = (b2 >> 6) & 0x03;
     u8 rm = b2 & 0x07;
 
-    // NOTE todo messages from below were from my last attempt at making this decoder
+    Operand rmDecoded = DecodeRegMem(p, rm, mod, w);
+    Operand immDecoded = DecodeImmediate(p, w);
 
-    // TODO I think something here is going wrong and causing me to segfault
-    // size_t consumed_before = *consumed;
-    // Operand rm_decoded = decode_rm(file, offset, consumed, rm, mod, w);
-    // offset += *consumed - consumed_before; // update offset to reflect bytes read in decode_rm
-    // Operand imm_decoded = decode_immediate(file, offset, consumed, w);
-
-    // TODO handle converting this part
-    // const char *dst = rm_buf;
-    // if (mod == 0b11) {
-    //     printf("%s %s, %d\n", mnemonic, dst, data);
-    // } else if (w == 1) {
-    //     printf("%s word %s, %d\n", mnemonic, dst, data);
-    // } else {
-    //     printf("%s byte %s, %d\n", mnemonic, dst, data);
-    // }
+    instruction.src = immDecoded;
+    instruction.dst = rmDecoded;
 
     return instruction;
 }
@@ -539,6 +529,104 @@ Instruction AddSubCmpImmAccum(u8 **p) {
 
     instruction.src = immDecoded;
     instruction.dst = accumDecoded;
+
+    return instruction;
+}
+
+Instruction CondJmp(u8 **p) {
+    Instruction instruction;
+
+    u8 b1 = ReadByte(p);
+    u8 b2 = ReadByte(p);
+
+    switch (b1 & 0x0f) {
+        case 0x00:
+            instruction.mnemonic = MNEMONIC_JO;
+            break;
+        case 0x01:
+            instruction.mnemonic = MNEMONIC_JNO;
+            break;
+        case 0x02:
+            instruction.mnemonic = MNEMONIC_JB;
+            break;
+        case 0x03:
+            instruction.mnemonic = MNEMONIC_JNB;
+            break;
+        case 0x04:
+            instruction.mnemonic = MNEMONIC_JE;
+            break;
+        case 0x05:
+            instruction.mnemonic = MNEMONIC_JNE;
+            break;
+        case 0x06:
+            instruction.mnemonic = MNEMONIC_JL;
+            break;
+        case 0x07:
+            instruction.mnemonic = MNEMONIC_JNL;
+            break;
+        case 0x08:
+            instruction.mnemonic = MNEMONIC_JS;
+            break;
+        case 0x09:
+            instruction.mnemonic = MNEMONIC_JNS;
+            break;
+        case 0x0a:
+            instruction.mnemonic = MNEMONIC_JP;
+            break;
+        case 0x0b:
+            instruction.mnemonic = MNEMONIC_JNP;
+            break;
+        case 0x0c:
+            instruction.mnemonic = MNEMONIC_JL;
+            break;
+        case 0x0d:
+            instruction.mnemonic = MNEMONIC_JNL;
+            break;
+        case 0x0e:
+            instruction.mnemonic = MNEMONIC_JLE;
+            break;
+        case 0x0f:
+            instruction.mnemonic = MNEMONIC_JNLE;
+            break;
+    }
+
+    Operand increment;
+    increment.type = OPERAND_TYPE_IMMEDIATE;
+    increment.imm = b2;
+
+    instruction.src = increment;
+    instruction.dst = Operand{ .type = OPERAND_TYPE_NULL };
+
+    return instruction;
+}
+
+Instruction Loop(u8 **p) {
+    Instruction instruction;
+
+    u8 b1 = ReadByte(p);
+    u8 b2 = ReadByte(p);
+
+    switch (b1 & 0x03) {
+        case 0x00:
+            instruction.mnemonic = MNEMONIC_LOOPNZ;
+            break;
+        case 0x01:
+            instruction.mnemonic = MNEMONIC_LOOPZ;
+            break;
+        case 0x02:
+            instruction.mnemonic = MNEMONIC_LOOP;
+            break;
+        case 0x03:
+            instruction.mnemonic = MNEMONIC_JCXZ;
+            break;
+    }
+
+    Operand increment;
+    increment.type = OPERAND_TYPE_IMMEDIATE;
+    increment.imm = b2;
+
+    instruction.src = increment;
+    instruction.dst = { .type = OPERAND_TYPE_NULL };
 
     return instruction;
 }
@@ -604,39 +692,36 @@ void BuildLookupTable(InstructionHandler *table) {
     table[0xbd] = MovImmReg;
     table[0xbe] = MovImmReg;
     table[0xbf] = MovImmReg;
-    //     // Jump: Unconditional jump
-    //     table[0x70] = cond_jmp;
-    //     table[0x71] = cond_jmp;
-    //     table[0x72] = cond_jmp;
-    //     table[0x73] = cond_jmp;
-    //     table[0x74] = cond_jmp;
-    //     table[0x75] = cond_jmp;
-    //     table[0x76] = cond_jmp;
-    //     table[0x77] = cond_jmp;
-    //     table[0x78] = cond_jmp;
-    //     table[0x79] = cond_jmp;
-    //     table[0x7a] = cond_jmp;
-    //     table[0x7b] = cond_jmp;
-    //     table[0x7c] = cond_jmp;
-    //     table[0x7d] = cond_jmp;
-    //     table[0x7e] = cond_jmp;
-    //     table[0x7f] = cond_jmp;
-    //     // Loop: Loop instructions
-    //     table[0xe0] = loop;
-    //     table[0xe1] = loop;
-    //     table[0xe2] = loop;
-    //     table[0xe3] = loop;
+    // Jump: Conditional jump
+    table[0x70] = CondJmp;
+    table[0x71] = CondJmp;
+    table[0x72] = CondJmp;
+    table[0x73] = CondJmp;
+    table[0x74] = CondJmp;
+    table[0x75] = CondJmp;
+    table[0x76] = CondJmp;
+    table[0x77] = CondJmp;
+    table[0x78] = CondJmp;
+    table[0x79] = CondJmp;
+    table[0x7a] = CondJmp;
+    table[0x7b] = CondJmp;
+    table[0x7c] = CondJmp;
+    table[0x7d] = CondJmp;
+    table[0x7e] = CondJmp;
+    table[0x7f] = CondJmp;
+    // Loop: Loop instructions
+    table[0xe0] = Loop;
+    table[0xe1] = Loop;
+    table[0xe2] = Loop;
+    table[0xe3] = Loop;
 }
 
 // Read the decoded instructions into `instructions` and return the number of instructions that were decoded.
 size_t DecodeInstructions(Instruction *instructions, ByteArray *a, InstructionHandler *table) {
     u8 *p = a->buf;
-    u8 *q = a->buf;
     size_t count = 0;
-    while (p - q < a->size) {
-        u8 idx = *p;
-        // printf("Index: %x\n", idx);
-        printf("byte: %x\n", *p);
+    while (p - a->buf < a->size) {
+        printf("Decoding instruction with first byte: 0x%x\n", *p);
         instructions[count++] = table[*p](&p);
     }
 
@@ -649,18 +734,15 @@ void PrintInstructions(Instruction *instructions, size_t count) {
 
     printf("bits 16\n\n");
 
-    // for (size_t i = 0; i < count; i++) {
-    //     Instruction instruction = instructions[i];
-    //     const char *mnemonic = MnemonicAsString(instruction.mnemonic);
-    //     OperandAsString(srcBuf, instruction.src);
-    //     OperandAsString(dstBuf, instruction.dst);
-    //     printf("%s %s, %s\n", mnemonic, dstBuf, srcBuf);
-    // }
     for (Instruction *p = instructions; (p - instructions) < count; p++) {
         const char *mnemonic = MnemonicAsString(p->mnemonic);
         OperandAsString(srcBuf, p->src);
         OperandAsString(dstBuf, p->dst);
-        printf("%s %s, %s\n", mnemonic, dstBuf, srcBuf);
+        if (p->dst.type == OPERAND_TYPE_NULL) {
+            printf("%s %s\n", mnemonic, srcBuf);
+        } else {
+            printf("%s %s, %s\n", mnemonic, dstBuf, srcBuf);
+        }
     }
 }
 
