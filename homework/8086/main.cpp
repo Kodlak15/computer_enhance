@@ -199,11 +199,12 @@ struct EffectiveAddress {
 // Read the string representation of the effective address calculation into buf.
 void EffectiveAddressAsString(char buf[], EffectiveAddress ea) {
     if (ea.reg1 == REGISTER_NULL) {
-        sprintf(buf, "[%d]", ea.disp);
+        sprintf(buf, (ea.disp > 0) ? "[%d]" : "[]", ea.disp);
     } else if (ea.reg2 == REGISTER_NULL) {
-        sprintf(buf, "[%s + %d]", RegisterAsString(ea.reg1), ea.disp);
+        sprintf(buf, (ea.disp > 0) ? "[%s + %d]" : "[%s]", RegisterAsString(ea.reg1), ea.disp);
     } else {
-        sprintf(buf, "[%s + %s + %d]", RegisterAsString(ea.reg1), RegisterAsString(ea.reg2), ea.disp);
+        sprintf(buf, (ea.disp > 0) ? "[%s + %s + %d]" : "[%s + %s]", RegisterAsString(ea.reg1),
+                RegisterAsString(ea.reg2), ea.disp);
     }
 }
 
@@ -364,13 +365,13 @@ Operand DecodeRegMem(u8 **p, u8 rm, u8 mod, u8 w) {
     return o;
 }
 
-Operand DecodeImmediate(u8 **p, u8 w) {
+Operand DecodeImmediate(u8 **p, u8 s, u8 w) {
     Operand o;
     o.type = OPERAND_TYPE_IMMEDIATE;
 
     u8 dataLo;
     u8 dataHi;
-    if (w == 1) {
+    if (s == 0 && w == 1) {
         dataLo = ReadByte(p);
         dataHi = ReadByte(p);
         o.imm = (i16)((i16)dataLo | ((i16)dataHi << 8));
@@ -426,7 +427,7 @@ Instruction MovImmReg(u8 **p) {
     u8 w = (b1 >> 3) & 0x01;
     u8 reg = b1 & 0x07;
 
-    Operand immDecoded = DecodeImmediate(p, w);
+    Operand immDecoded = DecodeImmediate(p, 0, w);
     Operand regDecoded = DecodeReg(reg, w);
 
     instruction.src = immDecoded;
@@ -497,7 +498,7 @@ Instruction AddSubCmpImmRm(u8 **p) {
     u8 rm = b2 & 0x07;
 
     Operand rmDecoded = DecodeRegMem(p, rm, mod, w);
-    Operand immDecoded = DecodeImmediate(p, w);
+    Operand immDecoded = DecodeImmediate(p, s, w);
 
     instruction.src = immDecoded;
     instruction.dst = rmDecoded;
@@ -524,7 +525,7 @@ Instruction AddSubCmpImmAccum(u8 **p) {
 
     u8 w = b1 & 0x01;
 
-    Operand immDecoded = DecodeImmediate(p, w);
+    Operand immDecoded = DecodeImmediate(p, 0, w);
     Operand accumDecoded = DecodeReg(0x00, w);
 
     instruction.src = immDecoded;
@@ -721,7 +722,6 @@ size_t DecodeInstructions(Instruction *instructions, ByteArray *a, InstructionHa
     u8 *p = a->buf;
     size_t count = 0;
     while (p - a->buf < a->size) {
-        printf("Decoding instruction with first byte: 0x%x\n", *p);
         instructions[count++] = table[*p](&p);
     }
 
